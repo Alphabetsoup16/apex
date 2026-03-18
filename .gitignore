@@ -1,0 +1,10 @@
+vendor/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+.idea/
+.vscode/
+.DS_Store
+

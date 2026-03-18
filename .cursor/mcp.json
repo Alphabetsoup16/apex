@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "apex": {
+      "command": "python3",
+      "args": ["-m", "apex", "serve", "--transport", "stdio"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
+        "ANTHROPIC_MODEL": "${env:ANTHROPIC_MODEL}"
+      }
+    }
+  }
+}
+
