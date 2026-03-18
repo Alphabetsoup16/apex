@@ -98,6 +98,27 @@ Optional auth:
 - If `APEX_EXECUTION_BACKEND_API_KEY` is set, APEX sends `Authorization: Bearer <key>`
 - Use `APEX_EXECUTION_BACKEND_AUTH_HEADER` to override the header name (default `Authorization`)
 
+### Request shape
+
+APEX sends:
+
+```json
+{
+  "language": "python",
+  "run_id": "string",
+  "files": [{ "path": "solution.py", "content": "..." }],
+  "tests": [{ "path": "test_solution.py", "content": "..." }],
+  "limits": {
+    "cpu_seconds": 20,
+    "memory_mb": 512,
+    "wall_time_seconds": 60,
+    "allow_network": false,
+    "allow_filesystem_write": false,
+    "allow_dependency_install": false
+  }
+}
+```
+
 Your backend should return JSON shaped like:
 
 ```json
@@ -111,7 +132,7 @@ Your backend should return JSON shaped like:
 
 ## Verdict semantics for code mode
 
-- With `code_ground_truth=true`, APEX may return `high_verified` only if the sandboxed execution backend reports `pass=true`.
+- With `code_ground_truth=true`, APEX generates and executes two independent pytest suites, and may return `high_verified` only if the sandboxed execution backend reports `pass=true` for both.
 - With `code_ground_truth=false`, APEX will never return `high_verified` for code; it will return `needs_review` (with `metadata.verification_scale = "spec_only"`).
 
 When APEX calls the backend, it also includes conservative capability flags in `limits`:

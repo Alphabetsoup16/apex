@@ -98,14 +98,19 @@ async def generate_code_tests(
     client: AnthropicMessagesClient,
     prompt: str,
     config: EnsembleConfig,
+    suite_label: str = "tests_v1",
+    temperature: float = 0.2,
 ) -> CodeTests:
     # Tests are spec-derived only; we avoid including any code in the prompt here.
-    user = f"Task requirements:\n{prompt}\n\nNow write pytest tests."
+    user = (
+        f"Task requirements:\n{prompt}\n\n"
+        f"Now write pytest tests for {suite_label}."
+    )
     payload = await client.complete_json_object(
         system=_CODE_TESTS_SYSTEM_PROMPT,
         user=user,
         max_tokens=config.max_tokens,
-        temperature=0.2,
+        temperature=temperature,
     )
     # Convert payload dict -> validated model
     # (payload is already a dict from the JSON client)

@@ -50,9 +50,9 @@ class CodeTests(StrictBaseModel):
 
 class ExecutionResult(StrictBaseModel):
     pass_: bool = Field(alias="pass")
-    stdout: str = ""
-    stderr: str = ""
-    duration_ms: int = Field(ge=0, default=0)
+    stdout: str
+    stderr: str
+    duration_ms: int = Field(ge=0)
 
 
 class ApexRunToolResult(StrictBaseModel):

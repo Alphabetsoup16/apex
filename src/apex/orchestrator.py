@@ -162,11 +162,17 @@ async def apex_run(
         ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
 
         t_tests_start = time.perf_counter()
-        tests = await generate_code_tests(client=client, prompt=prompt, config=cfg)
-        tests_ms = int((time.perf_counter() - t_tests_start) * 1000)
+        tests_v1 = await generate_code_tests(
+            client=client,
+            prompt=prompt,
+            config=cfg,
+            suite_label="tests_v1",
+            temperature=0.2,
+        )
+        tests_v1_ms = int((time.perf_counter() - t_tests_start) * 1000)
 
         try:
-            validate_code_bundles(solution, tests)
+            validate_code_bundles(solution, tests_v1)
         except ValueError as ve:
             extraction_ok = False
             return ApexRunToolResult(
@@ -183,7 +189,7 @@ async def apex_run(
                     "error": str(ve),
                     "timings_ms": {
                         "ensemble": ensemble_ms,
-                        "tests": tests_ms,
+                        "tests": tests_v1_ms,
                         "adversarial": None,
                         "execution": None,
                         "total": int((time.perf_counter() - t_total_start) * 1000),
@@ -191,32 +197,120 @@ async def apex_run(
                 },
             )
 
+        tests_files_by_suite = [
+            [{"path": f.path, "content": f.content} for f in tests_v1.files]
+        ]
+
+        execution_passes: list[bool | None] | None = None
         execution_pass: bool | None = None
         execution_ms: int | None = None
+        execution_ms_per_suite: list[int | None] | None = None
+        tests_ms_per_suite: list[int] | None = None
+
         if code_ground_truth:
+            t_tests_v2_start = time.perf_counter()
+            tests_v2 = await generate_code_tests(
+                client=client,
+                prompt=prompt,
+                config=cfg,
+                suite_label="tests_v2",
+                temperature=0.5,
+            )
+            tests_v2_ms = int((time.perf_counter() - t_tests_v2_start) * 1000)
+
+            try:
+                validate_code_bundles(solution, tests_v2)
+            except ValueError as ve:
+                extraction_ok = False
+                return ApexRunToolResult(
+                    verdict="blocked",
+                    output=f"APEX blocked: {ve}",
+                    adversarial_review=None,
+                    execution=None,
+                    metadata={
+                        "mode": actual_mode,
+                        "ensemble_runs": ensemble_runs,
+                        "ground_truth_enabled": code_ground_truth,
+                        "run_id": run_id,
+                        "llm_model": llm_cfg.model,
+                        "error": str(ve),
+                        "timings_ms": {
+                            "ensemble": ensemble_ms,
+                            "tests": tests_v1_ms + tests_v2_ms,
+                            "adversarial": None,
+                            "execution": None,
+                            "total": int((time.perf_counter() - t_total_start) * 1000),
+                        },
+                    },
+                )
+
+            tests_files_by_suite.append(
+                [{"path": f.path, "content": f.content} for f in tests_v2.files]
+            )
+            tests_ms_per_suite = [tests_v1_ms, tests_v2_ms]
+
+            # Execute both suites.
             try:
                 backend = load_execution_backend_from_env()
-                t_exec_start = time.perf_counter()
-                execution = await backend.execute(
-                    run_id=run_id,
-                    solution=solution,
-                    tests=tests,
-                    limits=ExecutionLimits(),
-                )
-                execution_pass = execution.pass_
-                execution_ms = int((time.perf_counter() - t_exec_start) * 1000)
             except ExecutionBackendError:
+                execution_passes = [None, None]
                 execution_pass = None
-            except Exception:
-                execution_pass = False
+            else:
+                per_suite_passes: list[bool | None] = []
+                per_suite_ms: list[int | None] = []
+                execution_results: list[ExecutionResult | None] = []
+
+                for suite_idx, suite_tests in enumerate([tests_v1, tests_v2]):
+                    try:
+                        t_exec_start = time.perf_counter()
+                        exec_result = await backend.execute(
+                            run_id=f"{run_id}-suite{suite_idx}",
+                            solution=solution,
+                            tests=suite_tests,
+                            limits=ExecutionLimits(),
+                        )
+                        per_suite_passes.append(exec_result.pass_)
+                        per_suite_ms.append(
+                            int((time.perf_counter() - t_exec_start) * 1000)
+                        )
+                        execution_results.append(exec_result)
+                    except ExecutionBackendError:
+                        per_suite_passes.append(None)
+                        per_suite_ms.append(None)
+                        execution_results.append(None)
+                    except Exception:
+                        per_suite_passes.append(False)
+                        per_suite_ms.append(None)
+                        execution_results.append(None)
+
+                execution_passes = per_suite_passes
+                execution_pass = (
+                    False
+                    if any(p is False for p in per_suite_passes)
+                    else True
+                    if all(p is True for p in per_suite_passes)
+                    else None
+                )
+
+                execution_ms_per_suite = per_suite_ms
+                tests_ms_per_suite = [tests_v1_ms, tests_v2_ms]
+                execution_results_any = any(r is not None for r in execution_results)
+                execution_ms = (
+                    sum(ms for ms in per_suite_ms if ms is not None)
+                    if execution_results_any
+                    else None
+                )
+                execution = execution_results[0] if execution_results_any else None
+        else:
+            execution_pass = None
 
         t_adv_start = time.perf_counter()
         adversarial = await review_code(
             client=client,
             task_prompt=prompt,
             candidate=solution,
-            tests_files=[{"path": f.path, "content": f.content} for f in tests.files],
-            execution_pass=execution_pass,
+            tests_files_by_suite=tests_files_by_suite,
+            execution_passes=execution_passes,
             max_tokens=min(512, max_tokens),
         )
         adversarial_ms = int((time.perf_counter() - t_adv_start) * 1000)
@@ -254,11 +348,18 @@ async def apex_run(
                 "llm_model": llm_cfg.model,
                 "timings_ms": {
                     "ensemble": ensemble_ms,
-                    "tests": tests_ms,
+                    "tests": (
+                        (tests_ms_per_suite[0] + tests_ms_per_suite[1])
+                        if tests_ms_per_suite is not None
+                        else tests_v1_ms
+                    ),
                     "adversarial": adversarial_ms,
                     "execution": execution_ms,
                     "total": int((time.perf_counter() - t_total_start) * 1000),
                 },
+                "execution_passes": execution_passes,
+                "tests_ms_per_suite": tests_ms_per_suite,
+                "execution_ms_per_suite": execution_ms_per_suite,
             },
         )
     except Exception as e:

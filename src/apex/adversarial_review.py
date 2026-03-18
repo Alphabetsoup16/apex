@@ -70,21 +70,30 @@ async def review_code(
     client: AnthropicMessagesClient,
     task_prompt: str,
     candidate: CodeSolution,
-    tests_files: list[dict] | None,
-    execution_pass: bool | None,
+    tests_files_by_suite: list[list[dict]] | None,
+    execution_passes: list[bool | None] | None,
     max_tokens: int,
 ) -> AdversarialReview:
     solution_files = "\n".join(
         [f"--- {f.path} ---\n{f.content}" for f in candidate.files]
     )
+
     tests_info = ""
-    if tests_files is not None:
-        tests_info = "\n\nCandidate tests:\n" + "\n".join(
-            [f"--- {f['path']} ---\n{f['content']}" for f in tests_files]
-        )
+    if tests_files_by_suite is not None:
+        suite_sections: list[str] = []
+        for idx, suite in enumerate(tests_files_by_suite):
+            joined = "\n".join(
+                [f"--- {f['path']} ---\n{f['content']}" for f in suite]
+            )
+            suite_sections.append(f"\nCandidate tests suite {idx}:\n{joined}")
+        tests_info = "\n\n" + "\n".join(suite_sections).strip()
+
     exec_info = ""
-    if execution_pass is not None:
-        exec_info = f"\n\nExecution result:\n- pass: {execution_pass}\n"
+    if execution_passes is not None:
+        lines = []
+        for idx, passed in enumerate(execution_passes):
+            lines.append(f"- suite {idx}: pass={passed}")
+        exec_info = "\n\nExecution result:\n" + "\n".join(lines) + "\n"
 
     solution_files = _truncate(solution_files, max_chars=20000)
     tests_info = _truncate(tests_info, max_chars=20000)

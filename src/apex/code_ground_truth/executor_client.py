@@ -6,8 +6,14 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
-from apex.models import CodeFile, CodeSolution, CodeTests, ExecutionResult
+from apex.models import CodeSolution, CodeTests, ExecutionResult
+from apex.code_ground_truth.backend_contract import (
+    ExecutionBackendLimits,
+    ExecutionBackendRequest,
+    ExecutionBackendResponse,
+)
 
 
 @dataclass(frozen=True)
@@ -46,22 +52,25 @@ class HttpExecutionBackend:
         tests: CodeTests,
         limits: ExecutionLimits,
     ) -> ExecutionResult:
-        files = [{"path": f.path, "content": f.content} for f in solution.files]
-        test_files = [{"path": f.path, "content": f.content} for f in tests.files]
-        payload: dict[str, Any] = {
-            "language": "python",
-            "run_id": run_id,
-            "files": files,
-            "tests": test_files,
-            "limits": {
-                "cpu_seconds": limits.cpu_seconds,
-                "memory_mb": limits.memory_mb,
-                "wall_time_seconds": limits.wall_time_seconds,
-                "allow_network": limits.allow_network,
-                "allow_filesystem_write": limits.allow_filesystem_write,
-                "allow_dependency_install": limits.allow_dependency_install,
-            },
-        }
+        try:
+            # Build and validate the request payload via a strict contract.
+            request = ExecutionBackendRequest(
+                run_id=run_id,
+                files=solution.files,
+                tests=tests.files,
+                limits=ExecutionBackendLimits(
+                    cpu_seconds=limits.cpu_seconds,
+                    memory_mb=limits.memory_mb,
+                    wall_time_seconds=limits.wall_time_seconds,
+                    allow_network=limits.allow_network,
+                    allow_filesystem_write=limits.allow_filesystem_write,
+                    allow_dependency_install=limits.allow_dependency_install,
+                ),
+            )
+        except ValidationError as ve:
+            raise ExecutionBackendError(f"APEX internal request validation failed: {ve}") from ve
+
+        payload: dict[str, Any] = request.model_dump()
 
         url = self._execute_url()
         max_retries = int(os.environ.get("APEX_EXECUTION_BACKEND_RETRIES", "2"))
@@ -72,7 +81,13 @@ class HttpExecutionBackend:
                     resp = await client.post(url, json=payload, headers=self._auth_headers)
                 resp.raise_for_status()
                 data = resp.json()
-                return ExecutionResult.model_validate(data)
+                try:
+                    validated = ExecutionBackendResponse.model_validate(data)
+                except ValidationError as ve:
+                    raise ExecutionBackendError(
+                        f"Execution backend returned invalid response schema: {ve}"
+                    ) from ve
+                return validated
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code
                 last_err = e
