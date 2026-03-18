@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from typing import Literal
@@ -160,6 +161,20 @@ async def apex_run(
         solution = solutions[best_i]
         ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
 
+        tests_v2_task = None
+        tests_v2_start = None
+        if code_ground_truth:
+            tests_v2_start = time.perf_counter()
+            tests_v2_task = asyncio.create_task(
+                generate_code_tests(
+                    client=client,
+                    prompt=prompt,
+                    config=cfg,
+                    suite_label="tests_v2",
+                    temperature=0.5,
+                )
+            )
+
         t_tests_start = time.perf_counter()
         tests_v1 = await generate_code_tests(
             client=client,
@@ -207,15 +222,10 @@ async def apex_run(
         tests_ms_per_suite: list[int] | None = None
 
         if code_ground_truth:
-            t_tests_v2_start = time.perf_counter()
-            tests_v2 = await generate_code_tests(
-                client=client,
-                prompt=prompt,
-                config=cfg,
-                suite_label="tests_v2",
-                temperature=0.5,
-            )
-            tests_v2_ms = int((time.perf_counter() - t_tests_v2_start) * 1000)
+            assert tests_v2_task is not None
+            assert tests_v2_start is not None
+            tests_v2 = await tests_v2_task
+            tests_v2_ms = int((time.perf_counter() - tests_v2_start) * 1000)
 
             try:
                 validate_code_bundles(solution, tests_v2)
@@ -231,7 +241,7 @@ async def apex_run(
                         "ensemble_runs": ensemble_runs,
                         "ground_truth_enabled": code_ground_truth,
                         "run_id": run_id,
-                        "llm_model": llm_cfg.model,
+                        "llm_model": client.model,
                         "error": str(ve),
                         "timings_ms": {
                             "ensemble": ensemble_ms,
@@ -255,32 +265,35 @@ async def apex_run(
                 execution_passes = [None, None]
                 execution_pass = None
             else:
-                per_suite_passes: list[bool | None] = []
-                per_suite_ms: list[int | None] = []
-                execution_results: list[ExecutionResult | None] = []
-
-                for suite_idx, suite_tests in enumerate([tests_v1, tests_v2]):
+                async def _exec_suite(
+                    suite_idx: int, suite_tests: CodeTests
+                ) -> tuple[bool | None, int | None, ExecutionResult | None]:
+                    t_exec_start = time.perf_counter()
                     try:
-                        t_exec_start = time.perf_counter()
                         exec_result = await backend.execute(
                             run_id=f"{run_id}-suite{suite_idx}",
                             solution=solution,
                             tests=suite_tests,
                             limits=ExecutionLimits(),
                         )
-                        per_suite_passes.append(exec_result.pass_)
-                        per_suite_ms.append(
-                            int((time.perf_counter() - t_exec_start) * 1000)
-                        )
-                        execution_results.append(exec_result)
+                        ms = int((time.perf_counter() - t_exec_start) * 1000)
+                        return exec_result.pass_, ms, exec_result
                     except ExecutionBackendError:
-                        per_suite_passes.append(None)
-                        per_suite_ms.append(None)
-                        execution_results.append(None)
+                        return None, None, None
                     except Exception:
-                        per_suite_passes.append(False)
-                        per_suite_ms.append(None)
-                        execution_results.append(None)
+                        return False, None, None
+
+                exec_tasks = [
+                    asyncio.create_task(_exec_suite(0, tests_v1)),
+                    asyncio.create_task(_exec_suite(1, tests_v2)),
+                ]
+                exec_results: list[
+                    tuple[bool | None, int | None, ExecutionResult | None]
+                ] = await asyncio.gather(*exec_tasks)
+
+                per_suite_passes = [r[0] for r in exec_results]
+                per_suite_ms = [r[1] for r in exec_results]
+                execution_results = [r[2] for r in exec_results]
 
                 execution_passes = per_suite_passes
                 execution_pass = (
@@ -344,7 +357,7 @@ async def apex_run(
                 "ground_truth_enabled": code_ground_truth,
                 "verification_scale": "execution_ground_truth" if code_ground_truth else "spec_only",
                 "run_id": run_id,
-                "llm_model": llm_cfg.model,
+                "llm_model": client.model,
                 "timings_ms": {
                     "ensemble": ensemble_ms,
                     "tests": (

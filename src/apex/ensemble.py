@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import os
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -61,17 +63,22 @@ async def generate_text_variants(
     prompt: str,
     config: EnsembleConfig,
 ) -> list[TextCompletion]:
-    variants: list[TextCompletion] = []
-    for i in range(config.runs):
-        user = f"Task:\n{prompt}\n\nAnswer as the best possible response."
-        payload = await client.complete_json_object(
-            system=_TEXT_SYSTEM_PROMPT,
-            user=user,
-            max_tokens=config.max_tokens,
-            temperature=config.temperatures[i],
-        )
-        variants.append(TextCompletion.model_validate(payload))
-    return variants
+    semaphore = asyncio.Semaphore(int(os.environ.get("APEX_LLM_CONCURRENCY", "2")))
+
+    async def _one(i: int) -> TextCompletion:
+        async with semaphore:
+            user = f"Task:\n{prompt}\n\nAnswer as the best possible response."
+            payload = await client.complete_json_object(
+                system=_TEXT_SYSTEM_PROMPT,
+                user=user,
+                max_tokens=config.max_tokens,
+                temperature=config.temperatures[i],
+            )
+            return TextCompletion.model_validate(payload)
+
+    tasks = [asyncio.create_task(_one(i)) for i in range(config.runs)]
+    # asyncio.gather preserves order of `tasks`.
+    return list(await asyncio.gather(*tasks))
 
 
 async def generate_code_solution_variants(
@@ -80,17 +87,21 @@ async def generate_code_solution_variants(
     prompt: str,
     config: EnsembleConfig,
 ) -> list[CodeSolution]:
-    variants: list[CodeSolution] = []
-    for i in range(config.runs):
-        user = f"Task:\n{prompt}\n\nWrite the Python solution. Output must be JSON."
-        payload = await client.complete_json_object(
-            system=_CODE_SOLUTION_SYSTEM_PROMPT,
-            user=user,
-            max_tokens=config.max_tokens,
-            temperature=config.temperatures[i],
-        )
-        variants.append(CodeSolution.model_validate(payload))
-    return variants
+    semaphore = asyncio.Semaphore(int(os.environ.get("APEX_LLM_CONCURRENCY", "2")))
+
+    async def _one(i: int) -> CodeSolution:
+        async with semaphore:
+            user = f"Task:\n{prompt}\n\nWrite the Python solution. Output must be JSON."
+            payload = await client.complete_json_object(
+                system=_CODE_SOLUTION_SYSTEM_PROMPT,
+                user=user,
+                max_tokens=config.max_tokens,
+                temperature=config.temperatures[i],
+            )
+            return CodeSolution.model_validate(payload)
+
+    tasks = [asyncio.create_task(_one(i)) for i in range(config.runs)]
+    return list(await asyncio.gather(*tasks))
 
 
 async def generate_code_tests(
