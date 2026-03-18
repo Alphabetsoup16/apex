@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from apex.llm_interface import LLMClient
 from apex.safety.redaction import redact_secrets
 from apex.safety.validators import extract_first_json_object
 
@@ -24,6 +25,10 @@ class LLMConfig:
 class AnthropicMessagesClient:
     def __init__(self, config: LLMConfig):
         self._config = config
+
+    @property
+    def model(self) -> str:
+        return self._config.model
 
     async def complete_text(
         self,
@@ -128,4 +133,18 @@ def load_anthropic_config_from_env() -> LLMConfig:
     if not model:
         raise RuntimeError("Missing required env var: ANTHROPIC_MODEL")
     return LLMConfig(api_key=api_key, model=model, base_url=base_url)
+
+
+def load_llm_client_from_env() -> LLMClient:
+    """
+    Provider selection. For now only Anthropic is implemented.
+
+    Default:
+      APEX_LLM_PROVIDER=anthropic
+    """
+
+    provider = os.environ.get("APEX_LLM_PROVIDER", "anthropic").strip().lower()
+    if provider == "anthropic":
+        return AnthropicMessagesClient(load_anthropic_config_from_env())
+    raise RuntimeError(f"Unsupported LLM provider: {provider}")
 

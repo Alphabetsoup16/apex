@@ -11,7 +11,7 @@ from apex.ensemble import (
     generate_code_tests,
     generate_text_variants,
 )
-from apex.llm_client import AnthropicMessagesClient, load_anthropic_config_from_env
+from apex.llm_client import load_llm_client_from_env
 from apex.models import (
     ApexRunToolResult,
     CodeSolution,
@@ -92,8 +92,7 @@ async def apex_run(
     else:
         actual_mode = "text" if mode == "text" else "code"
 
-    llm_cfg = load_anthropic_config_from_env()
-    client = AnthropicMessagesClient(llm_cfg)
+    client = load_llm_client_from_env()
 
     extraction_ok = True
     execution: ExecutionResult | None = None
@@ -142,7 +141,7 @@ async def apex_run(
                     "ensemble_runs": ensemble_runs,
                     "convergence": convergence,
                     "run_id": run_id,
-                    "llm_model": llm_cfg.model,
+                    "llm_model": client.model,
                     "timings_ms": {
                         "ensemble": ensemble_ms,
                         "adversarial": adversarial_ms,
@@ -185,7 +184,7 @@ async def apex_run(
                     "ensemble_runs": ensemble_runs,
                     "ground_truth_enabled": code_ground_truth,
                     "run_id": run_id,
-                    "llm_model": llm_cfg.model,
+                    "llm_model": client.model,
                     "error": str(ve),
                     "timings_ms": {
                         "ensemble": ensemble_ms,

@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
-from apex.llm_client import AnthropicMessagesClient
 from apex.models import CodeSolution, CodeTests, TextCompletion
+from apex.llm_interface import LLMClient
 
 
 _TEXT_SYSTEM_PROMPT = """\
@@ -57,7 +57,7 @@ class EnsembleConfig:
 
 async def generate_text_variants(
     *,
-    client: AnthropicMessagesClient,
+    client: LLMClient,
     prompt: str,
     config: EnsembleConfig,
 ) -> list[TextCompletion]:
@@ -76,7 +76,7 @@ async def generate_text_variants(
 
 async def generate_code_solution_variants(
     *,
-    client: AnthropicMessagesClient,
+    client: LLMClient,
     prompt: str,
     config: EnsembleConfig,
 ) -> list[CodeSolution]:
@@ -95,7 +95,7 @@ async def generate_code_solution_variants(
 
 async def generate_code_tests(
     *,
-    client: AnthropicMessagesClient,
+    client: LLMClient,
     prompt: str,
     config: EnsembleConfig,
     suite_label: str = "tests_v1",

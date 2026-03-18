@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from apex.llm_client import AnthropicMessagesClient
 from apex.models import AdversarialReview, CodeSolution, TextCompletion
+from apex.llm_interface import LLMClient
 
 
 _ADVERSARIAL_SYSTEM_PROMPT = """\
@@ -43,7 +43,7 @@ def _truncate(s: str, *, max_chars: int) -> str:
 
 async def review_text(
     *,
-    client: AnthropicMessagesClient,
+    client: LLMClient,
     task_prompt: str,
     candidate: TextCompletion,
     max_tokens: int,
@@ -67,7 +67,7 @@ async def review_text(
 
 async def review_code(
     *,
-    client: AnthropicMessagesClient,
+    client: LLMClient,
     task_prompt: str,
     candidate: CodeSolution,
     tests_files_by_suite: list[list[dict]] | None,
