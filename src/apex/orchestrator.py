@@ -7,6 +7,7 @@ import time
 import uuid
 from typing import Any, Literal
 
+from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.adversarial_review import review_code, review_text
 from apex.ensemble import (
     EnsembleConfig,
@@ -192,7 +193,7 @@ async def _run_text_mode(
         baseline_similarity = _sequence_similarity(candidate.answer, known_good_baseline)
         # If the candidate diverges strongly from the known-good baseline,
         # downgrade even if ensemble/external signals look strong.
-        if verdict == "high_verified" and baseline_similarity < 0.8:
+        if verdict == "high_verified" and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD:
             verdict = "needs_review"
 
     return ApexRunToolResult(
@@ -445,7 +446,7 @@ async def _run_code_mode(
     baseline_similarity: float | None = None
     if known_good_baseline is not None:
         baseline_similarity = _sequence_similarity(_format_solution(solution), known_good_baseline)
-        if verdict == "high_verified" and baseline_similarity < 0.8:
+        if verdict == "high_verified" and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD:
             verdict = "needs_review"
 
     return ApexRunToolResult(
