@@ -80,7 +80,3 @@ make check
 
 `Makefile` uses `python -m ruff` when available; otherwise it looks for `vendor/bin/ruff` (local vendoring — not in git).
 
-CI runs ruff + pytest on push/PR (see `.github/workflows/ci.yml`).
-
-**Push fails on `workflow` / `.github/workflows`?** Your GitHub token needs the **`workflow`** scope (or use SSH). See [docs/github-push.md](docs/github-push.md).
-
