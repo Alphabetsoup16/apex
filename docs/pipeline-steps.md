@@ -22,6 +22,7 @@ This document is the **contract** for adding or changing verification stages.
 3. **Record** traces in `metadata["pipeline_steps"]`:
    - Append `trace.as_dict()` for each step that uses `run_async_step`.
    - For synchronous-only steps, you may append a hand-built dict with the same shape: `id`, `requirement`, `ok`, `duration_ms`, `detail`.
+   - For stages skipped by configuration, prefer `skipped_step_record()` from `step_support` so optional steps still appear in order with `detail.skipped` / a short `reason`.
 
 ## Example (pattern)
 

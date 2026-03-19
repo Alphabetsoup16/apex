@@ -72,3 +72,24 @@ async def run_async_step(
             duration_ms=ms,
             detail={"error": f"{type(e).__name__}: {e}"},
         )
+
+
+def skipped_step_record(
+    step_id: str,
+    requirement: StepRequirement,
+    *,
+    detail: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Stable trace for a stage that did not run (e.g. optional suite disabled by config).
+
+    Same shape as ``StepTrace.as_dict()`` so consumers can treat all rows uniformly.
+    """
+    merged = {"skipped": True, **(detail or {})}
+    return StepTrace(
+        id=step_id,
+        requirement=requirement,
+        ok=True,
+        duration_ms=0,
+        detail=merged,
+    ).as_dict()

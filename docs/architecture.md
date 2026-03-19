@@ -36,7 +36,7 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 - **Runner**: `apex.pipeline.step_support.run_async_step` — standard timing, `ok` convention, optional-step exception swallowing.
 - **Guide**: [pipeline-steps.md](pipeline-steps.md).
 
-Successful runs attach `metadata.pipeline_steps` with trace objects for steps that use the runner (today: `cot_audit`; extend the same way).
+Successful runs attach `metadata.pipeline_steps` with trace objects for each logical stage (ensemble, CoT audit, reviews, optional skips, etc.); see `docs/pipeline-steps.md`.
 
 ## Tests
 

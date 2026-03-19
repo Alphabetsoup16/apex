@@ -78,8 +78,11 @@ CODE_PIPELINE_STEPS: tuple[PipelineStepSpec, ...] = (
         id="test_generation_v2",
         requirement=OPTIONAL,
         modes=("code",),
-        summary="Second suite only when ``code_ground_truth`` is enabled.",
-        verdict_impact="Enables dual-suite execution ladder.",
+        summary=(
+            "Second suite when ``code_ground_truth`` is enabled; trace includes an explicit skip "
+            "row when disabled."
+        ),
+        verdict_impact="Enables dual-suite execution ladder; validation failure blocks.",
     ),
     PipelineStepSpec(
         id="execution_backend",

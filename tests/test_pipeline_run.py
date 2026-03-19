@@ -87,9 +87,15 @@ def test_apex_run_text_mode_uses_review_and_sets_signals(monkeypatch: pytest.Mon
     assert isinstance(result.metadata["timings_ms"]["adversarial"], int)
     assert captured["signals"].execution_required is False
     assert captured["signals"].execution_pass is None
-    assert result.metadata.get("pipeline_steps")
-    assert result.metadata["pipeline_steps"][0]["id"] == "cot_audit"
-    assert result.metadata["pipeline_steps"][0]["ok"] is True
+    steps = result.metadata.get("pipeline_steps")
+    assert steps
+    assert [s["id"] for s in steps] == [
+        "ensemble",
+        "cot_audit",
+        "adversarial_review",
+        "baseline_alignment",
+    ]
+    assert all(s["ok"] for s in steps)
 
 
 def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
@@ -715,9 +721,10 @@ def test_apex_run_text_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
     assert result.verdict == "blocked"
     assert result.adversarial_review is None
     assert result.execution is None
-    assert result.metadata.get("pipeline_steps")
-    assert result.metadata["pipeline_steps"][0]["id"] == "cot_audit"
-    assert result.metadata["pipeline_steps"][0]["ok"] is False
+    steps = result.metadata.get("pipeline_steps")
+    assert steps
+    assert [s["id"] for s in steps] == ["ensemble", "cot_audit"]
+    assert steps[-1]["ok"] is False
 
 
 def test_apex_run_text_mode_baseline_downgrades_high_verified(monkeypatch: pytest.MonkeyPatch):

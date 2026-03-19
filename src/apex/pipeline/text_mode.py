@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import time
-from typing import Literal
+from typing import Any, Literal
 
 from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.generation.ensemble import EnsembleConfig, generate_text_variants
 from apex.models import ApexRunToolResult, TextCompletion
 from apex.pipeline.helpers import blocked_run_result, sequence_similarity
-from apex.pipeline.step_support import REQUIRED, run_async_step
+from apex.pipeline.step_support import OPTIONAL, REQUIRED, run_async_step, skipped_step_record
 from apex.review.adversarial import review_text
 from apex.review.pack import build_pr_review_pack
 from apex.safety.cot_audit import audit_chain_of_thought
@@ -30,18 +30,50 @@ async def run_text_mode(
     repo_conventions: str | None,
     output_mode: str,
 ) -> ApexRunToolResult:
-    t_ensemble_start = time.perf_counter()
-    variants: list[TextCompletion] = await generate_text_variants(
-        client=client, prompt=prompt, config=cfg
-    )
-    convergence = text_convergence(variants)
-    best_i = select_best_text(variants)
-    candidate = variants[best_i]
-    ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
+    pipeline_steps: list[dict[str, Any]] = []
+    ctx: dict[str, Any] = {}
 
-    pipeline_steps: list[dict] = []
+    async def _ensemble() -> dict[str, Any]:
+        t0 = time.perf_counter()
+        variants: list[TextCompletion] = await generate_text_variants(
+            client=client, prompt=prompt, config=cfg
+        )
+        convergence = text_convergence(variants)
+        best_i = select_best_text(variants)
+        candidate = variants[best_i]
+        ensemble_ms = int((time.perf_counter() - t0) * 1000)
+        ctx["variants"] = variants
+        ctx["candidate"] = candidate
+        ctx["convergence"] = convergence
+        ctx["ensemble_ms"] = ensemble_ms
+        return {"ok": True, "convergence": convergence}
 
-    async def _cot_audit() -> dict:
+    ens = await run_async_step("ensemble", REQUIRED, _ensemble)
+    pipeline_steps.append(ens.as_dict())
+    if not ens.ok:
+        return blocked_run_result(
+            output="APEX blocked: ensemble stage failed",
+            error=str(ens.detail),
+            actual_mode=actual_mode,
+            ensemble_runs=ensemble_runs,
+            code_ground_truth=False,
+            run_id=run_id,
+            llm_model=client.model,
+            timings_ms={
+                "ensemble": ctx.get("ensemble_ms"),
+                "tests": None,
+                "adversarial": None,
+                "execution": None,
+                "total": int((time.perf_counter() - t_total_start) * 1000),
+            },
+            extra_metadata={"pipeline_steps": pipeline_steps},
+        )
+
+    candidate: TextCompletion = ctx["candidate"]
+    convergence: float = ctx["convergence"]
+    ensemble_ms: int = ctx["ensemble_ms"]
+
+    async def _cot_audit() -> dict[str, Any]:
         cot_text = candidate.answer + "\n" + "\n".join(candidate.key_claims)
         findings = audit_chain_of_thought(cot_text, context="text")
         if findings:
@@ -73,14 +105,42 @@ async def run_text_mode(
             },
         )
 
-    t_adv_start = time.perf_counter()
-    adversarial = await review_text(
-        client=client,
-        task_prompt=prompt,
-        candidate=candidate,
-        max_tokens=min(512, max_tokens),
-    )
-    adversarial_ms = int((time.perf_counter() - t_adv_start) * 1000)
+    async def _adversarial() -> dict[str, Any]:
+        t0 = time.perf_counter()
+        adversarial = await review_text(
+            client=client,
+            task_prompt=prompt,
+            candidate=candidate,
+            max_tokens=min(512, max_tokens),
+        )
+        adversarial_ms = int((time.perf_counter() - t0) * 1000)
+        ctx["adversarial"] = adversarial
+        ctx["adversarial_ms"] = adversarial_ms
+        return {"ok": True, "finding_count": len(adversarial.findings)}
+
+    adv_trace = await run_async_step("adversarial_review", REQUIRED, _adversarial)
+    pipeline_steps.append(adv_trace.as_dict())
+    if not adv_trace.ok:
+        return blocked_run_result(
+            output="APEX blocked: adversarial review stage failed",
+            error=str(adv_trace.detail),
+            actual_mode=actual_mode,
+            ensemble_runs=ensemble_runs,
+            code_ground_truth=False,
+            run_id=run_id,
+            llm_model=client.model,
+            timings_ms={
+                "ensemble": ensemble_ms,
+                "tests": None,
+                "adversarial": ctx.get("adversarial_ms"),
+                "execution": None,
+                "total": int((time.perf_counter() - t_total_start) * 1000),
+            },
+            extra_metadata={"pipeline_steps": pipeline_steps},
+        )
+
+    adversarial = ctx["adversarial"]
+    adversarial_ms: int = ctx["adversarial_ms"]
 
     high = any(f.severity == "high" for f in adversarial.findings)
     medium = any(f.severity == "medium" for f in adversarial.findings)
@@ -98,12 +158,32 @@ async def run_text_mode(
 
     baseline_similarity: float | None = None
     if known_good_baseline is not None:
-        baseline_similarity = sequence_similarity(candidate.answer, known_good_baseline)
-        if (
-            verdict == "high_verified"
-            and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
-        ):
-            verdict = "needs_review"
+
+        async def _baseline_alignment() -> dict[str, Any]:
+            nonlocal verdict
+            sim = sequence_similarity(candidate.answer, known_good_baseline)
+            downgraded = False
+            if verdict == "high_verified" and sim < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD:
+                verdict = "needs_review"
+                downgraded = True
+            ctx["baseline_similarity"] = sim
+            return {
+                "ok": True,
+                "similarity": sim,
+                "downgraded": downgraded,
+            }
+
+        bl = await run_async_step("baseline_alignment", OPTIONAL, _baseline_alignment)
+        pipeline_steps.append(bl.as_dict())
+        baseline_similarity = ctx.get("baseline_similarity")
+    else:
+        pipeline_steps.append(
+            skipped_step_record(
+                "baseline_alignment",
+                OPTIONAL,
+                detail={"reason": "known_good_baseline_not_set"},
+            )
+        )
 
     return ApexRunToolResult(
         verdict=verdict,
