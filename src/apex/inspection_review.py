@@ -45,10 +45,13 @@ async def inspect_code_doc_only(
     tests_files_by_suite: list[list[dict]] | None,
     execution_passes: list[bool | None] | None,
     max_tokens: int,
+    language: str | None = None,
+    diff: str | None = None,
+    repo_conventions: str | None = None,
 ) -> AdversarialReview:
-    solution_files = "\n".join(
-        [f"--- {f.path} ---\n{f.content}" for f in candidate.files]
-    )
+    # Token efficiency: if a diff is provided, inspect primarily from the diff and
+    # only include minimal file context.
+    solution_files = "\n".join([f"--- {f.path} ---\n{f.content}" for f in candidate.files])
 
     tests_info = ""
     if tests_files_by_suite is not None:
@@ -65,14 +68,24 @@ async def inspect_code_doc_only(
             lines.append(f"- suite {idx}: pass={passed}")
         exec_info = "\n\nExecution results (if available):\n" + "\n".join(lines) + "\n"
 
-    solution_files = _truncate(solution_files, max_chars=20000)
-    tests_info = _truncate(tests_info, max_chars=20000)
+    diff_info = ""
+    if diff:
+        diff_info = "\n\nDiff:\n" + _truncate(diff, max_chars=12000)
+        # When diff is present, avoid sending full code unless needed.
+        solution_files = _truncate(solution_files, max_chars=6000)
+    else:
+        solution_files = _truncate(solution_files, max_chars=20000)
+
+    tests_info = _truncate(tests_info, max_chars=12000)
 
     user = (
-        f"Task requirements:\n{task_prompt}\n\n"
-        f"Candidate code:\n{solution_files}"
+        (f"Language:\n{language}\n\n" if language else "")
+        + (f"Repo conventions:\n{_truncate(repo_conventions, max_chars=2000)}\n\n" if repo_conventions else "")
+        + f"Task requirements:\n{task_prompt}\n\n"
+        + f"Candidate code (may be truncated):\n{solution_files}"
         f"{tests_info}"
         f"{exec_info}\n"
+        f"{diff_info}"
         "Inspect for correctness risks and spec violations. Return ONLY the JSON findings."
     )
 

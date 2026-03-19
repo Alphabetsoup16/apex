@@ -17,6 +17,10 @@ def create_mcp_server() -> FastMCP:
         max_tokens: int = 1024,
         code_ground_truth: bool = False,
         known_good_baseline: str | None = None,
+        language: str | None = None,
+        diff: str | None = None,
+        repo_conventions: str | None = None,
+        output_mode: str = "candidate",
     ):
         """
         Run APEX verification on a prompt.
@@ -36,6 +40,10 @@ def create_mcp_server() -> FastMCP:
             max_tokens=max_tokens,
             code_ground_truth=code_ground_truth,
             known_good_baseline=known_good_baseline,
+            language=language,
+            diff=diff,
+            repo_conventions=repo_conventions,
+            output_mode=output_mode,
         )
         return result.model_dump(by_alias=True)
 

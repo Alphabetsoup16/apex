@@ -13,6 +13,12 @@ APEX exposes a single MCP tool: `apex.run`.
 - `max_tokens` (int, default: `1024`)
 - `known_good_baseline` (string | null, optional)
   - if provided, APEX can downgrade `high_verified` when output divergence is large
+- `language` (string | null, optional)
+- `diff` (string | null, optional)
+- `repo_conventions` (string | null, optional)
+- `output_mode` (string, default: `candidate`)
+  - `candidate`: return the best candidate output (current default behavior)
+  - `review_pack`: return a PR review pack synthesized from findings
 
 ## Output fields
 

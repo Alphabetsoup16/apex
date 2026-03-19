@@ -77,7 +77,6 @@ async def generate_text_variants(
             return TextCompletion.model_validate(payload)
 
     tasks = [asyncio.create_task(_one(i)) for i in range(config.runs)]
-    # asyncio.gather preserves order of `tasks`.
     return list(await asyncio.gather(*tasks))
 
 
@@ -124,6 +123,5 @@ async def generate_code_tests(
         temperature=temperature,
     )
     # Convert payload dict -> validated model
-    # (payload is already a dict from the JSON client)
     return CodeTests.model_validate(payload)
 

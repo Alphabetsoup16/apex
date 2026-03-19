@@ -40,6 +40,7 @@ from apex.code_ground_truth.executor_client import (
     load_execution_backend_from_env,
 )
 from apex.inspection_review import inspect_code_doc_only
+from apex.review_pack import build_pr_review_pack
 from apex.safety.cot_audit import audit_chain_of_thought
 
 
@@ -138,6 +139,10 @@ async def _run_text_mode(
     run_id: str,
     t_total_start: float,
     known_good_baseline: str | None,
+    language: str | None,
+    diff: str | None,
+    repo_conventions: str | None,
+    output_mode: str,
 ) -> ApexRunToolResult:
     t_ensemble_start = time.perf_counter()
     variants = await generate_text_variants(client=client, prompt=prompt, config=cfg)
@@ -200,7 +205,19 @@ async def _run_text_mode(
 
     return ApexRunToolResult(
         verdict=verdict,
-        output=candidate.answer,
+        output=(
+            build_pr_review_pack(
+                language=language,
+                verdict=verdict,
+                prompt=prompt,
+                diff=diff,
+                repo_conventions=repo_conventions,
+                adversarial=adversarial,
+                inspection=None,
+            )
+            if output_mode == "review_pack"
+            else candidate.answer
+        ),
         adversarial_review=adversarial,
         metadata={
             "mode": actual_mode,
@@ -209,6 +226,7 @@ async def _run_text_mode(
             "run_id": run_id,
             "llm_model": client.model,
             "baseline_similarity": baseline_similarity,
+            "output_mode": output_mode,
             "timings_ms": {
                 "ensemble": ensemble_ms,
                 "adversarial": adversarial_ms,
@@ -230,6 +248,10 @@ async def _run_code_mode(
     run_id: str,
     t_total_start: float,
     known_good_baseline: str | None,
+    language: str | None,
+    diff: str | None,
+    repo_conventions: str | None,
+    output_mode: str,
 ) -> ApexRunToolResult:
     extraction_ok = True
     execution: ExecutionResult | None = None
@@ -446,6 +468,9 @@ async def _run_code_mode(
                 tests_files_by_suite=tests_files_by_suite,
                 execution_passes=execution_passes,
                 max_tokens=min(512, max_tokens),
+                language=language,
+                diff=diff,
+                repo_conventions=repo_conventions,
             )
             return review, int((time.perf_counter() - t_ins_start) * 1000)
         except asyncio.CancelledError:
@@ -482,7 +507,19 @@ async def _run_code_mode(
 
     return ApexRunToolResult(
         verdict=verdict,
-        output=_format_solution(solution),
+        output=(
+            build_pr_review_pack(
+                language=language,
+                verdict=verdict,
+                prompt=prompt,
+                diff=diff,
+                repo_conventions=repo_conventions,
+                adversarial=adversarial,
+                inspection=inspection,
+            )
+            if output_mode == "review_pack"
+            else _format_solution(solution)
+        ),
         adversarial_review=adversarial,
         execution=execution,
         metadata={
@@ -496,6 +533,7 @@ async def _run_code_mode(
             "run_id": run_id,
             "llm_model": client.model,
             "baseline_similarity": baseline_similarity,
+            "output_mode": output_mode,
             "timings_ms": {
                 "ensemble": ensemble_ms,
                 "tests": (
@@ -512,6 +550,7 @@ async def _run_code_mode(
             "tests_ms_per_suite": tests_ms_per_suite,
             "execution_ms_per_suite": execution_ms_per_suite,
             "inspection_review": inspection.model_dump(),
+            "language": language,
         },
     )
 
@@ -524,6 +563,10 @@ async def apex_run(
     max_tokens: int = 1024,
     code_ground_truth: bool = False,
     known_good_baseline: str | None = None,
+    language: str | None = None,
+    diff: str | None = None,
+    repo_conventions: str | None = None,
+    output_mode: str = "candidate",
 ) -> ApexRunToolResult:
     run_id = str(uuid.uuid4())
     ensemble_runs = 2 if ensemble_runs < 2 else min(3, ensemble_runs)
@@ -556,6 +599,10 @@ async def apex_run(
                 run_id=run_id,
                 t_total_start=t_total_start,
                 known_good_baseline=known_good_baseline,
+                language=language,
+                diff=diff,
+                repo_conventions=repo_conventions,
+                output_mode=output_mode,
             )
 
         # code mode (python)
@@ -570,6 +617,10 @@ async def apex_run(
             run_id=run_id,
             t_total_start=t_total_start,
             known_good_baseline=known_good_baseline,
+            language=language,
+            diff=diff,
+            repo_conventions=repo_conventions,
+            output_mode=output_mode,
         )
     except asyncio.CancelledError:
         # Let structured cancellation propagate cleanly.
