@@ -3,12 +3,12 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-from apex.adversarial_review import review_text
-from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
-from apex.ensemble import EnsembleConfig, generate_text_variants
+from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
+from apex.generation.ensemble import EnsembleConfig, generate_text_variants
 from apex.models import ApexRunToolResult, TextCompletion
 from apex.pipeline.helpers import blocked_code_result, sequence_similarity
-from apex.review_pack import build_pr_review_pack
+from apex.review.adversarial import review_text
+from apex.review.pack import build_pr_review_pack
 from apex.safety.cot_audit import audit_chain_of_thought
 from apex.scoring import DecisionSignals, decide_verdict, select_best_text, text_convergence
 

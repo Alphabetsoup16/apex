@@ -12,16 +12,12 @@ def _normalize_ws(s: str) -> str:
 
 
 def _normalize_claim(s: str) -> str:
-    # Lowercase + remove non-alphanumerics; keep it simple and deterministic.
     s = s.strip().lower()
     s = "".join(ch for ch in s if ch.isalnum() or ch.isspace())
     return " ".join(s.split())
 
 
 def _pairwise_average_similarity(a: list[str], b: list[str]) -> float:
-    """
-    Average best-match similarity between two claim sets.
-    """
     if not a and not b:
         return 1.0
     if not a or not b:
@@ -34,7 +30,6 @@ def _pairwise_average_similarity(a: list[str], b: list[str]) -> float:
     if not a_norm or not b_norm:
         return 0.0
 
-    # Best-match from A to B.
     scores_a_to_b: list[float] = []
     for ca in a_norm:
         best = 0.0
@@ -42,7 +37,6 @@ def _pairwise_average_similarity(a: list[str], b: list[str]) -> float:
             best = max(best, difflib.SequenceMatcher(a=ca, b=cb).ratio())
         scores_a_to_b.append(best)
 
-    # Symmetrize by best-match from B to A.
     scores_b_to_a: list[float] = []
     for cb in b_norm:
         best = 0.0
@@ -62,7 +56,6 @@ def text_convergence(variants: list[TextCompletion]) -> float:
     answers = [_normalize_ws(v.answer) for v in variants]
     key_claims = [v.key_claims for v in variants]
 
-    # Average pairwise similarity: combine answer wording + claim-set agreement.
     pairs: list[float] = []
     for i in range(len(answers)):
         for j in range(i + 1, len(answers)):
@@ -73,15 +66,9 @@ def text_convergence(variants: list[TextCompletion]) -> float:
 
 
 def code_signature(solution: CodeSolution) -> tuple[str, ...]:
-    """
-    Very lightweight, deterministic signature for “is this the same solution shape”.
-    We avoid deep semantic equivalence (hard) and focus on stable structural features.
-    """
-
     content_by_path = {f.path: f.content for f in solution.files}
     main = content_by_path.get("solution.py")
     if not main:
-        # Fall back to first file.
         main = next(iter(content_by_path.values()), "")
     try:
         tree = ast.parse(main)
@@ -144,10 +131,6 @@ def code_convergence(variants: list[CodeSolution]) -> float:
 
 
 def select_best_text(variants: list[TextCompletion]) -> int:
-    """
-    Choose the answer that is most similar to the others.
-    """
-
     answers = [_normalize_ws(v.answer) for v in variants]
     claims = [v.key_claims for v in variants]
     best_i = 0
@@ -204,7 +187,6 @@ def decide_verdict(signals: DecisionSignals) -> str:
     if signals.execution_required and signals.execution_pass is False:
         return "blocked"
 
-    # high_verified requires both strong convergence and no high severity.
     if signals.execution_required:
         if (
             signals.execution_pass is True

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 
+from apex.llm.interface import LLMClient
 from apex.llm.providers.anthropic_messages import AnthropicConfig, AnthropicMessagesClient
-from apex.llm_interface import LLMClient
 
 
 def load_llm_client_from_env() -> LLMClient:

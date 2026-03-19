@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from apex.server import create_mcp_server
+from apex.mcp.server import create_mcp_server
 
 
 def main() -> None:

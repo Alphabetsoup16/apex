@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apex.llm_interface import LLMClient
+from apex.llm.interface import LLMClient
 from apex.models import AdversarialReview, CodeSolution, TextCompletion
 
 _ADVERSARIAL_SYSTEM_PROMPT = """\

@@ -30,7 +30,7 @@ APEX produces a result by combining three signals:
 If `known_good_baseline` is provided, APEX computes a conservative similarity score against the candidate output.
 
 If the preliminary verdict is `high_verified` but the baseline similarity is below:
-- `BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD` (currently `0.8`)
+- `BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD` in `apex.config.constants` (currently `0.8`)
 
 APEX downgrades to `needs_review`.
 

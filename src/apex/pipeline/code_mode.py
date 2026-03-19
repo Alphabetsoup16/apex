@@ -5,19 +5,18 @@ import contextlib
 import time
 from typing import Literal
 
-from apex.adversarial_review import review_code
 from apex.code_ground_truth.executor_client import (
     ExecutionBackendError,
     ExecutionLimits,
     load_execution_backend_from_env,
 )
-from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
-from apex.ensemble import (
+from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
+from apex.config.policy import load_findings_policy
+from apex.generation.ensemble import (
     EnsembleConfig,
     generate_code_solution_variants,
     generate_code_tests,
 )
-from apex.inspection_review import inspect_code_doc_only
 from apex.models import (
     AdversarialReview,
     ApexRunToolResult,
@@ -31,8 +30,9 @@ from apex.pipeline.helpers import (
     sequence_similarity,
     validate_code_bundles,
 )
-from apex.policy import load_findings_policy
-from apex.review_pack import build_pr_review_pack
+from apex.review.adversarial import review_code
+from apex.review.inspection import inspect_code_doc_only
+from apex.review.pack import build_pr_review_pack
 from apex.safety.cot_audit import audit_chain_of_thought
 from apex.scoring import DecisionSignals, code_convergence, decide_verdict, select_best_code
 

@@ -5,8 +5,8 @@ import time
 import uuid
 from typing import Literal
 
-from apex.conventions import load_effective_conventions
-from apex.ensemble import EnsembleConfig
+from apex.config.conventions import load_effective_conventions
+from apex.generation.ensemble import EnsembleConfig
 from apex.llm.loader import load_llm_client_from_env
 from apex.models import ApexRunToolResult, Mode
 from apex.pipeline.code_mode import run_code_mode

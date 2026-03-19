@@ -84,7 +84,6 @@ def build_pr_review_pack(
         lines.append("- None")
     lines.append("")
 
-    # Keep the original prompt for traceability but avoid bloat.
     lines.append("### Task (truncated)")
     truncated = prompt.strip()
     if len(truncated) > 2000:

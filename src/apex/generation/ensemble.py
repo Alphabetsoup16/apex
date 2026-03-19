@@ -4,7 +4,7 @@ import asyncio
 import os
 from dataclasses import dataclass
 
-from apex.llm_interface import LLMClient
+from apex.llm.interface import LLMClient
 from apex.models import CodeSolution, CodeTests, TextCompletion
 
 _TEXT_SYSTEM_PROMPT = """\
@@ -109,7 +109,6 @@ async def generate_code_tests(
     suite_label: str = "tests_v1",
     temperature: float = 0.2,
 ) -> CodeTests:
-    # Tests are spec-derived only; we avoid including any code in the prompt here.
     user = f"Task requirements:\n{prompt}\n\nNow write pytest tests for {suite_label}."
     payload = await client.complete_json_object(
         system=_CODE_TESTS_SYSTEM_PROMPT,
@@ -117,5 +116,4 @@ async def generate_code_tests(
         max_tokens=config.max_tokens,
         temperature=temperature,
     )
-    # Convert payload dict -> validated model
     return CodeTests.model_validate(payload)

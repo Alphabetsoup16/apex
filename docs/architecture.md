@@ -1,30 +1,34 @@
 # Architecture
 
-APEX is organized around a **light verification layer** (fast feedback while authoring/reviewing) and **optional** sandbox execution for code. Heavy CI (full matrix, SAST, dependency scans) stays outside this repo’s scope.
+APEX is organized around a **light verification layer** (fast feedback while authoring/reviewing) and **optional** sandbox execution for code. Heavy CI stays outside this repo’s scope.
 
-## Layout
+## Package layout (`src/apex/`)
 
-| Area | Package / module | Responsibility |
-|------|------------------|----------------|
-| Entry | `apex.pipeline.run` | `apex_run`: mode routing, client + conventions, error boundary |
-| Text path | `apex.pipeline.text_mode` | Ensemble → CoT audit → adversarial → baseline → verdict |
-| Code path | `apex.pipeline.code_mode` | Ensemble → CoT audit → tests → optional dual-suite execution → parallel adversarial + inspection |
-| Shared | `apex.pipeline.helpers` | Mode inference, bundle validation, blocked-result helper, baseline similarity |
-| Stable imports | `apex.orchestrator` | Thin re-exports: `apex_run`, `validate_code_bundles`, `infer_mode_from_prompt` |
-| LLM | `apex.llm.*`, `apex.llm_interface` | Provider adapter + env-based loader |
-| Review | `apex.adversarial_review`, `apex.inspection_review`, `apex.review_pack` | Structured LLM review + PR pack output |
-| Signals | `apex.scoring` | Convergence + verdict policy |
+| Area | Location | Responsibility |
+|------|-----------|----------------|
+| MCP entry | `apex.mcp.server` | FastMCP tool wiring (`create_mcp_server`) |
+| CLI | `apex.__main__` | `apex serve` |
+| Pipeline | `apex.pipeline.*` | `apex_run` router, text/code mode flows, shared helpers |
+| Models | `apex.models` | Pydantic schemas (tool I/O, findings, code bundles) |
+| Config | `apex.config.*` | Thresholds (`constants`), conventions merge (`conventions`), findings policy (`policy`) |
+| Generation | `apex.generation.*` | Ensemble prompts + variant generation |
+| Review | `apex.review.*` | Adversarial pass, doc-only inspection, PR review pack |
+| Scoring | `apex.scoring` | Convergence, selection, verdict policy |
+| LLM | `apex.llm.*` | `interface` (protocol), `loader`, `providers/*` |
 | Safety | `apex.safety.*` | Redaction, JSON extraction, CoT heuristics |
-| Policy | `apex.policy` | Optional suppression of finding types/severities |
-| Conventions | `apex.conventions` | Global + repo + per-call merge |
-| Execution (optional) | `apex.code_ground_truth.*` | HTTP backend client + request/response contract |
+| Execution (optional) | `apex.code_ground_truth.*` | Backend client + JSON contract |
 
-## Why `pipeline/` exists
+## Stable imports
 
-- **Separation of concerns:** routing (`run.py`) stays small; text vs code flows are independent files.
-- **Testability:** unit tests monkeypatch the module where a dependency is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`).
-- **Product alignment:** optional execution is localized in `code_mode` + `code_ground_truth`, not mixed into generic orchestration.
+- **`apex.orchestrator`**: thin re-exports of `apex_run`, `validate_code_bundles`, `infer_mode_from_prompt` for callers that predate the `pipeline` split.
+- **`apex.pipeline.run.apex_run`**: same entrypoint (preferred for new code).
 
-## MCP surface
+## Why this shape
 
-`apex.server` wires FastMCP to `apex_run` (via `apex.orchestrator` or `apex.pipeline.run`—same function).
+- **Pipeline** stays orchestration-only; **generation** / **review** / **scoring** are independently testable.
+- **Config** is grouped so env/file policy does not sprawl across the tree.
+- **MCP** is isolated from core logic so the server surface is one import.
+
+## Tests
+
+Behavioral tests patch the module where a name is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a re-export shim.

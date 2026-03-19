@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from apex.config.policy import FindingsPolicy
 from apex.models import AdversarialReview, Finding
-from apex.policy import FindingsPolicy
 
 
 def test_findings_policy_filters_by_type_and_severity() -> None:

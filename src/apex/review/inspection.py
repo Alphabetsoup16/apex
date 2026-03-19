@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apex.llm_interface import LLMClient
+from apex.llm.interface import LLMClient
 from apex.models import AdversarialReview, CodeSolution
 
 _INSPECTION_SYSTEM_PROMPT = """\
@@ -49,8 +49,6 @@ async def inspect_code_doc_only(
     diff: str | None = None,
     repo_conventions: str | None = None,
 ) -> AdversarialReview:
-    # Token efficiency: if a diff is provided, inspect primarily from the diff and
-    # only include minimal file context.
     solution_files = "\n".join([f"--- {f.path} ---\n{f.content}" for f in candidate.files])
 
     tests_info = ""
@@ -71,7 +69,6 @@ async def inspect_code_doc_only(
     diff_info = ""
     if diff:
         diff_info = "\n\nDiff:\n" + _truncate(diff, max_chars=12000)
-        # When diff is present, avoid sending full code unless needed.
         solution_files = _truncate(solution_files, max_chars=6000)
     else:
         solution_files = _truncate(solution_files, max_chars=20000)

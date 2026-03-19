@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any
 
-from apex.ensemble import EnsembleConfig, generate_code_tests, generate_text_variants
-from apex.llm_interface import LLMClient
+from apex.generation.ensemble import EnsembleConfig, generate_code_tests, generate_text_variants
+from apex.llm.interface import LLMClient
 from apex.models import CodeTests, TextCompletion
 
 
