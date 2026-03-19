@@ -20,3 +20,13 @@ When leakage is detected:
 
 Note: CoT auditing is heuristic and intentionally errs on the side of blocking.
 
+## Doc-only inspection (code mode)
+
+In `mode=code`, APEX also runs an additional “inspection” pass that relies on LLM knowledge (no external doc retrieval yet).
+
+Policy:
+- Findings with `severity="high"` can affect the verdict (may block or downgrade outcomes)
+- Findings with `severity="medium"` or `severity="low"` are included for reporting, but do not affect the verdict yet
+
+This stage is designed to be extensible later (e.g., swap in doc retrieval via Context7 or static analyzers per language).
+

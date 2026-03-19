@@ -28,3 +28,9 @@ If the preliminary verdict is `high_verified` but the baseline similarity is bel
 
 APEX downgrades to `needs_review`.
 
+## Inspection stage policy (code mode)
+
+If an optional inspection pass reports findings:
+- `high` findings can affect the final verdict
+- `medium`/`low` findings are reported, but do not by themselves downgrade/grade the verdict
+
