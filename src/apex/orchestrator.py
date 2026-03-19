@@ -8,6 +8,7 @@ import uuid
 from typing import Any, Literal
 
 from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
+from apex.conventions import load_effective_conventions
 from apex.adversarial_review import review_code, review_text
 from apex.models import AdversarialReview
 from apex.ensemble import (
@@ -577,6 +578,7 @@ async def apex_run(
         actual_mode = "text" if mode == "text" else "code"
 
     client = load_llm_client_from_env()
+    effective_conventions = load_effective_conventions(repo_conventions=repo_conventions)
 
     extraction_ok = True
     execution: ExecutionResult | None = None
@@ -601,7 +603,7 @@ async def apex_run(
                 known_good_baseline=known_good_baseline,
                 language=language,
                 diff=diff,
-                repo_conventions=repo_conventions,
+                repo_conventions=effective_conventions,
                 output_mode=output_mode,
             )
 
@@ -619,7 +621,7 @@ async def apex_run(
             known_good_baseline=known_good_baseline,
             language=language,
             diff=diff,
-            repo_conventions=repo_conventions,
+            repo_conventions=effective_conventions,
             output_mode=output_mode,
         )
     except asyncio.CancelledError:

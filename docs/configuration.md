@@ -23,3 +23,10 @@ Currently, only Anthropic is implemented.
 
 This bounds concurrent ensemble generation and helps keep latency predictable.
 
+## Conventions (optional)
+
+- Repo-local: `.apex/conventions.md` (or `.apex/conventions.txt`)
+- Global/company: set `APEX_GLOBAL_CONVENTIONS_PATH` to point at a file
+
+APEX will merge global + repo-local + per-call `repo_conventions` (in that order).
+
