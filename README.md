@@ -82,3 +82,5 @@ make check
 
 CI runs ruff + pytest on push/PR (see `.github/workflows/ci.yml`).
 
+**Push fails on `workflow` / `.github/workflows`?** Your GitHub token needs the **`workflow`** scope (or use SSH). See [docs/github-push.md](docs/github-push.md).
+

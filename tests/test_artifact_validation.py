@@ -1,7 +1,7 @@
 import pytest
 
 from apex.models import CodeFile, CodeSolution, CodeTests
-from apex.orchestrator import validate_code_bundles
+from apex.pipeline.helpers import validate_code_bundles
 
 
 def test_validate_code_bundles_missing_solution_py():

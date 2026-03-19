@@ -3,7 +3,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from apex.models import Mode
-from apex.orchestrator import apex_run
+from apex.pipeline.run import apex_run
 
 
 def create_mcp_server() -> FastMCP:

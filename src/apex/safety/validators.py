@@ -5,7 +5,7 @@ def extract_first_json_object(text: str) -> str:
     """
     Extract the first top-level JSON object from a string.
 
-    This avoids brittle regexes and keeps the orchestrator resilient to small
+    This avoids brittle regexes and keeps the pipeline resilient to small
     wrapper text like "Here is the JSON:".
     """
 

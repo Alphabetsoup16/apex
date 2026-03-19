@@ -18,10 +18,11 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 | Safety | `apex.safety.*` | Redaction, JSON extraction, CoT heuristics |
 | Execution (optional) | `apex.code_ground_truth.*` | Backend client + JSON contract |
 
-## Stable imports
+## Public entrypoints
 
-- **`apex.orchestrator`**: convenience re-exports of `apex_run`, `validate_code_bundles`, `infer_mode_from_prompt` (same objects as `apex.pipeline`).
-- **`apex.pipeline.run.apex_run`**: same entrypoint (preferred for new code).
+- **`apex.pipeline.run.apex_run`**: MCP / CLI entry.
+- **`apex.pipeline.helpers`**: `validate_code_bundles`, `infer_mode_from_prompt`, etc.
+- **`apex.pipeline`**: re-exports `apex_run` from `apex.pipeline.run`.
 
 ## Why this shape
 

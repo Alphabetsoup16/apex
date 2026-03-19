@@ -1,5 +1,6 @@
 # Documentation
 
+- [Git push / PAT (workflow scope)](github-push.md)
 - [Architecture](architecture.md)
 - [Pipeline steps (adding stages)](pipeline-steps.md)
 - [Tool interface contract](tool-interface.md)
