@@ -30,3 +30,19 @@ This bounds concurrent ensemble generation and helps keep latency predictable.
 
 APEX will merge global + repo-local + per-call `repo_conventions` (in that order).
 
+## Findings policy (optional)
+
+You can optionally suppress certain finding categories from the reported results.
+
+- Repo-local: `.apex/policy.json`
+- Global/company: set `APEX_GLOBAL_POLICY_PATH` to point at a JSON file
+
+Schema (both locations):
+
+```json
+{
+  "ignored_types": ["style", "formatting"],
+  "ignored_severities": ["low"]
+}
+```
+

@@ -11,13 +11,14 @@ from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.conventions import load_effective_conventions
 from apex.adversarial_review import review_code, review_text
 from apex.models import AdversarialReview
+from apex.policy import load_findings_policy
 from apex.ensemble import (
     EnsembleConfig,
     generate_code_solution_variants,
     generate_code_tests,
     generate_text_variants,
 )
-from apex.llm_client import load_llm_client_from_env
+from apex.llm.loader import load_llm_client_from_env
 from apex.models import (
     ApexRunToolResult,
     CodeSolution,
@@ -254,6 +255,7 @@ async def _run_code_mode(
     repo_conventions: str | None,
     output_mode: str,
 ) -> ApexRunToolResult:
+    findings_policy = load_findings_policy()
     extraction_ok = True
     execution: ExecutionResult | None = None
     adversarial = None
@@ -481,6 +483,8 @@ async def _run_code_mode(
         _run_adversarial_review(),
         _run_code_inspection(),
     )
+    adversarial = findings_policy.apply(adversarial)
+    inspection = findings_policy.apply(inspection)
 
     high = any(f.severity == "high" for f in adversarial.findings)
     medium = any(f.severity == "medium" for f in adversarial.findings)

@@ -9,4 +9,6 @@ to avoid breaking existing imports.
 
 from apex.llm.loader import load_llm_client_from_env
 
+__all__ = ["load_llm_client_from_env"]
+
 
