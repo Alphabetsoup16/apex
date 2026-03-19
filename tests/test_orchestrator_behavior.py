@@ -121,6 +121,17 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeyp
             findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
         )
 
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        return AdversarialReview(findings=[])
+
     def fake_decide_verdict(signals):
         # Core behavioral contract: code mode requests execution, but backend failure yields `execution_pass=None`.
         assert signals.execution_required is True
@@ -130,6 +141,7 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeyp
     monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
     monkeypatch.setattr(orchestrator, "decide_verdict", fake_decide_verdict)
 
     def fake_load_execution_backend_from_env():
@@ -180,6 +192,30 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
             findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
         )
 
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [True, True]
+        return AdversarialReview(findings=[])
+
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [True, True]
+        return AdversarialReview(findings=[])
+
     class _FakeBackend:
         async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
             # Always pass to ensure `execution_pass=True`.
@@ -193,11 +229,13 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
         captured["execution_pass"] = signals.execution_pass
         assert signals.execution_required is True
         assert signals.execution_pass is True
+        assert signals.adversarial_high is False
         return "high_verified"
 
     monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
     monkeypatch.setattr(orchestrator, "decide_verdict", fake_decide_verdict)
     monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
 
@@ -261,6 +299,163 @@ def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
     assert result.metadata.get("cot_audit", {}).get("detected") is True
 
 
+def test_apex_run_code_mode_inspection_high_blocks_verdict(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [_solution_bundle()]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        v = 1 if suite_label == "tests_v1" else 2
+        return _tests_bundle(v)
+
+    async def fake_review_code(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        # No adversarial findings from the adversarial reviewer.
+        assert execution_passes == [True, True]
+        return AdversarialReview(findings=[])
+
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [True, True]
+        return AdversarialReview(
+            findings=[
+                Finding(
+                    severity="high",
+                    type="t",
+                    confidence=0.9,
+                    evidence="doc-based high issue",
+                )
+            ]
+        )
+
+    class _FakeBackend:
+        async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
+            return ExecutionResult(
+                **{"pass": True},
+                stdout="ok",
+                stderr="",
+                duration_ms=1,
+            )
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+        )
+    )
+
+    assert result.verdict == "blocked"
+    assert result.metadata["execution_passes"] == [True, True]
+    assert "inspection_review" in result.metadata
+
+
+def test_apex_run_code_mode_inspection_medium_does_not_block(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [_solution_bundle()]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        v = 1 if suite_label == "tests_v1" else 2
+        return _tests_bundle(v)
+
+    async def fake_review_code(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        # No adversarial findings.
+        assert execution_passes == [True, True]
+        return AdversarialReview(findings=[])
+
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        # Medium inspection findings should be reported, but not block/downgrade.
+        assert execution_passes == [True, True]
+        return AdversarialReview(
+            findings=[
+                Finding(
+                    severity="medium",
+                    type="t",
+                    confidence=0.7,
+                    evidence="doc-based medium issue",
+                )
+            ]
+        )
+
+    class _FakeBackend:
+        async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
+            return ExecutionResult(
+                **{"pass": True},
+                stdout="ok",
+                stderr="",
+                duration_ms=1,
+            )
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+        )
+    )
+
+    assert result.verdict == "high_verified"
+    assert result.metadata["execution_passes"] == [True, True]
+    assert result.metadata["inspection_review"]["findings"][0]["severity"] == "medium"
+
+
 def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -287,9 +482,15 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
     async def fake_review_code(**kwargs):
         raise AssertionError("review_code should not be called when tests bundle validation fails")
 
+    async def fake_inspect_code_doc_only(**kwargs):
+        raise AssertionError(
+            "inspect_code_doc_only should not be called when tests bundle validation fails"
+        )
+
     monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
 
     result = asyncio.run(
         orchestrator.apex_run(
@@ -329,9 +530,23 @@ def test_apex_run_code_ground_truth_false_never_high_verified(
             findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
         )
 
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes is None
+        assert task_prompt.lower().startswith("write code")
+        return AdversarialReview(findings=[])
+
     monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
 
     result = asyncio.run(
         orchestrator.apex_run(
@@ -371,6 +586,19 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
             findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
         )
 
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [True, False]
+        assert task_prompt.lower().startswith("write")
+        return AdversarialReview(findings=[])
+
     class _FakeBackend:
         async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
             # orchestrator uses: f"{run_id}-suite{suite_idx}"
@@ -386,6 +614,7 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
     monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
     monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
 
     result = asyncio.run(
@@ -499,6 +728,18 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
             findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
         )
 
+    async def fake_inspect_code_doc_only(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [True, True]
+        return AdversarialReview(findings=[])
+
     class _FakeBackend:
         async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
             return ExecutionResult(
@@ -511,6 +752,7 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
     monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
     monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
 
     result = asyncio.run(

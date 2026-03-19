@@ -38,6 +38,7 @@ from apex.code_ground_truth.executor_client import (
     ExecutionLimits,
     load_execution_backend_from_env,
 )
+from apex.inspection_review import inspect_code_doc_only
 from apex.safety.cot_audit import audit_chain_of_thought
 
 
@@ -427,8 +428,24 @@ async def _run_code_mode(
     )
     adversarial_ms = int((time.perf_counter() - t_adv_start) * 1000)
 
+    # Inspection is an additional spec-focused review. Policy:
+    # - only "high" findings can affect the verdict
+    # - medium/low findings are reported in metadata only
+    t_ins_start = time.perf_counter()
+    inspection = await inspect_code_doc_only(
+        client=client,
+        task_prompt=prompt,
+        candidate=solution,
+        tests_files_by_suite=tests_files_by_suite,
+        execution_passes=execution_passes,
+        max_tokens=min(512, max_tokens),
+    )
+    inspection_ms = int((time.perf_counter() - t_ins_start) * 1000)
+
     high = any(f.severity == "high" for f in adversarial.findings)
     medium = any(f.severity == "medium" for f in adversarial.findings)
+    inspection_high = any(f.severity == "high" for f in inspection.findings)
+    high = high or inspection_high
 
     verdict = decide_verdict(
         DecisionSignals(
@@ -473,12 +490,14 @@ async def _run_code_mode(
                     else tests_v1_ms
                 ),
                 "adversarial": adversarial_ms,
+                "inspection": inspection_ms,
                 "execution": execution_ms,
                 "total": int((time.perf_counter() - t_total_start) * 1000),
             },
             "execution_passes": execution_passes,
             "tests_ms_per_suite": tests_ms_per_suite,
             "execution_ms_per_suite": execution_ms_per_suite,
+            "inspection_review": inspection.model_dump(),
         },
     )
 
