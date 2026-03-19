@@ -39,7 +39,7 @@ async def _my_step() -> dict:
 trace = await run_async_step("my_step", REQUIRED, _my_step)
 pipeline_steps.append(trace.as_dict())
 if not trace.ok:
-    return blocked_code_result(..., extra_metadata={"pipeline_steps": pipeline_steps})
+    return blocked_run_result(..., extra_metadata={"pipeline_steps": pipeline_steps})
 ```
 
 For an **optional** step that should never take down the run:

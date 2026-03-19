@@ -20,7 +20,7 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 
 ## Stable imports
 
-- **`apex.orchestrator`**: thin re-exports of `apex_run`, `validate_code_bundles`, `infer_mode_from_prompt` for callers that predate the `pipeline` split.
+- **`apex.orchestrator`**: convenience re-exports of `apex_run`, `validate_code_bundles`, `infer_mode_from_prompt` (same objects as `apex.pipeline`).
 - **`apex.pipeline.run.apex_run`**: same entrypoint (preferred for new code).
 
 ## Why this shape
@@ -39,4 +39,4 @@ Successful runs attach `metadata.pipeline_steps` with trace objects for steps th
 
 ## Tests
 
-Behavioral tests patch the module where a name is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a re-export shim.
+Behavioral tests patch the module where a name is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a different import path for the same symbol.

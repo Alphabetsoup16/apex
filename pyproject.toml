@@ -12,6 +12,12 @@ dependencies = [
   "pydantic>=2.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
 [project.scripts]
 apex = "apex.__main__:main"
 
@@ -24,6 +30,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100

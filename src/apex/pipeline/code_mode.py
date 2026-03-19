@@ -25,7 +25,7 @@ from apex.models import (
     ExecutionResult,
 )
 from apex.pipeline.helpers import (
-    blocked_code_result,
+    blocked_run_result,
     format_solution,
     sequence_similarity,
     validate_code_bundles,
@@ -81,7 +81,7 @@ async def run_code_mode(
     pipeline_steps.append(cot_trace.as_dict())
     if not cot_trace.ok:
         findings = cot_trace.detail.get("findings") or []
-        return blocked_code_result(
+        return blocked_run_result(
             output="APEX blocked: chain-of-thought leakage detected",
             error="cot_findings=" + ",".join(str(x) for x in findings),
             actual_mode=actual_mode,
@@ -134,7 +134,7 @@ async def run_code_mode(
             tests_v2_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await tests_v2_task
-        return blocked_code_result(
+        return blocked_run_result(
             output=f"APEX blocked: {ve}",
             error=str(ve),
             actual_mode=actual_mode,
@@ -170,7 +170,7 @@ async def run_code_mode(
             validate_code_bundles(solution, tests_v2)
         except ValueError as ve:
             extraction_ok = False
-            return blocked_code_result(
+            return blocked_run_result(
                 output=f"APEX blocked: {ve}",
                 error=str(ve),
                 actual_mode=actual_mode,

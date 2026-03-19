@@ -45,7 +45,7 @@ def validate_code_bundles(solution: CodeSolution, tests: CodeTests) -> None:
         raise ValueError("missing_test_solution_py")
 
 
-def blocked_code_result(
+def blocked_run_result(
     *,
     output: str,
     error: str,
@@ -57,7 +57,7 @@ def blocked_code_result(
     timings_ms: dict[str, int | None],
     extra_metadata: dict[str, Any] | None = None,
 ) -> ApexRunToolResult:
-    """Build a blocked verdict for text or code mode (name is historical)."""
+    """Build a ``verdict=blocked`` tool result (text or code mode)."""
     return ApexRunToolResult(
         verdict="blocked",
         output=output,

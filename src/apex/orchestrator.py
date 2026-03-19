@@ -1,8 +1,8 @@
 """
-Stable import path for the verification entrypoint.
+Public entrypoint imports for ``apex_run`` and small pipeline helpers.
 
-Implementation is organized under ``apex.pipeline`` (light layer: text/code modes;
-optional execution isolated in ``code_mode`` + ``apex.code_ground_truth``).
+Core implementation: ``apex.pipeline`` (text/code modes; optional execution in
+``code_mode`` + ``apex.code_ground_truth``).
 """
 
 from __future__ import annotations

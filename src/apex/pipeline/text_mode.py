@@ -6,7 +6,7 @@ from typing import Literal
 from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.generation.ensemble import EnsembleConfig, generate_text_variants
 from apex.models import ApexRunToolResult, TextCompletion
-from apex.pipeline.helpers import blocked_code_result, sequence_similarity
+from apex.pipeline.helpers import blocked_run_result, sequence_similarity
 from apex.pipeline.step_support import REQUIRED, run_async_step
 from apex.review.adversarial import review_text
 from apex.review.pack import build_pr_review_pack
@@ -52,7 +52,7 @@ async def run_text_mode(
     pipeline_steps.append(cot_trace.as_dict())
     if not cot_trace.ok:
         findings = cot_trace.detail.get("findings") or []
-        return blocked_code_result(
+        return blocked_run_result(
             output="APEX blocked: chain-of-thought leakage detected",
             error="cot_findings=" + ",".join(str(x) for x in findings),
             actual_mode=actual_mode,

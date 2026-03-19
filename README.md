@@ -56,6 +56,7 @@ APEX exposes `apex.run` with:
 
 See:
 - [Architecture](docs/architecture.md)
+- [Pipeline steps (extending verification)](docs/pipeline-steps.md)
 - [Tool interface contract](docs/tool-interface.md)
 - [Verification semantics](docs/verification.md)
 - [Code execution backend contract](docs/code-execution.md)
@@ -69,12 +70,15 @@ See:
 
 ## Contributing
 
-Lint and test:
+Use a virtualenv, install the package and dev tools, then run checks:
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
 make check
-# or: PYTHONPATH=src:vendor python3 -m pytest -q
 ```
 
-Report issues and propose improvements via GitHub PRs.
+`Makefile` uses `python -m ruff` when available; otherwise it looks for `vendor/bin/ruff` (local vendoring — not in git).
+
+CI runs ruff + pytest on push/PR (see `.github/workflows/ci.yml`).
 
