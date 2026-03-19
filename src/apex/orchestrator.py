@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.adversarial_review import review_code, review_text
+from apex.models import AdversarialReview
 from apex.ensemble import (
     EnsembleConfig,
     generate_code_solution_variants,
@@ -417,30 +418,43 @@ async def _run_code_mode(
     else:
         execution_pass = None
 
-    t_adv_start = time.perf_counter()
-    adversarial = await review_code(
-        client=client,
-        task_prompt=prompt,
-        candidate=solution,
-        tests_files_by_suite=tests_files_by_suite,
-        execution_passes=execution_passes,
-        max_tokens=min(512, max_tokens),
-    )
-    adversarial_ms = int((time.perf_counter() - t_adv_start) * 1000)
+    async def _run_adversarial_review() -> tuple[AdversarialReview, int]:
+        t_adv_start = time.perf_counter()
+        try:
+            review = await review_code(
+                client=client,
+                task_prompt=prompt,
+                candidate=solution,
+                tests_files_by_suite=tests_files_by_suite,
+                execution_passes=execution_passes,
+                max_tokens=min(512, max_tokens),
+            )
+            return review, int((time.perf_counter() - t_adv_start) * 1000)
+        except asyncio.CancelledError:
+            raise
 
-    # Inspection is an additional spec-focused review. Policy:
-    # - only "high" findings can affect the verdict
-    # - medium/low findings are reported in metadata only
-    t_ins_start = time.perf_counter()
-    inspection = await inspect_code_doc_only(
-        client=client,
-        task_prompt=prompt,
-        candidate=solution,
-        tests_files_by_suite=tests_files_by_suite,
-        execution_passes=execution_passes,
-        max_tokens=min(512, max_tokens),
+    async def _run_code_inspection() -> tuple[AdversarialReview, int]:
+        # Inspection is an additional spec-focused review. Policy:
+        # - only "high" findings can affect the verdict
+        # - medium/low findings are reported in metadata only
+        t_ins_start = time.perf_counter()
+        try:
+            review = await inspect_code_doc_only(
+                client=client,
+                task_prompt=prompt,
+                candidate=solution,
+                tests_files_by_suite=tests_files_by_suite,
+                execution_passes=execution_passes,
+                max_tokens=min(512, max_tokens),
+            )
+            return review, int((time.perf_counter() - t_ins_start) * 1000)
+        except asyncio.CancelledError:
+            raise
+
+    (adversarial, adversarial_ms), (inspection, inspection_ms) = await asyncio.gather(
+        _run_adversarial_review(),
+        _run_code_inspection(),
     )
-    inspection_ms = int((time.perf_counter() - t_ins_start) * 1000)
 
     high = any(f.severity == "high" for f in adversarial.findings)
     medium = any(f.severity == "medium" for f in adversarial.findings)
