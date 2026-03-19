@@ -118,6 +118,11 @@ The tool returns JSON with:
 - `adversarial_review` (structured findings, or `null`)
 - `execution` (execution result for code mode, or `null`)
 
+Notes on `metadata`:
+
+- if `known_good_baseline` is provided, `metadata.baseline_similarity` may be included
+- if chain-of-thought leakage is detected, `metadata.cot_audit` is included and the verdict is `blocked`
+
 ## Code-mode execution contract (what the backend must implement)
 
 APEX will `POST` JSON to `{APEX_EXECUTION_BACKEND_URL}/execute` (if the URL already ends with `/execute`, it is used as-is).

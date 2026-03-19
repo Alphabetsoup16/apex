@@ -22,8 +22,11 @@ def create_mcp_server() -> FastMCP:
         Run APEX verification on a prompt.
 
         For text: returns the best candidate answer plus structured adversarial findings.
+        Optional `known_good_baseline` can downgrade `high_verified` when outputs diverge.
+
         For code: generates a Python solution + pytest tests. If `code_ground_truth=true`,
         it executes tests via `APEX_EXECUTION_BACKEND_URL`, then returns a deterministic verdict.
+        Also performs chain-of-thought auditing on generated solution content.
         """
 
         result = await apex_run(
