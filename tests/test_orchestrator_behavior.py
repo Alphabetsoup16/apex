@@ -217,6 +217,50 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
     assert result.execution is not None
 
 
+def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.5)
+    monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        # Put a CoT marker inside the generated code comment.
+        return [
+            CodeSolution(
+                files=[
+                    CodeFile(
+                        path="solution.py",
+                        content="# chain-of-thought: this is forbidden\n\ndef f():\n    return 1\n",
+                    )
+                ]
+            )
+        ]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        raise AssertionError("generate_code_tests should not run when CoT leakage is detected")
+
+    async def fake_review_code(**kwargs):
+        raise AssertionError("review_code should not run when CoT leakage is detected")
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=False,
+        )
+    )
+
+    assert result.verdict == "blocked"
+    assert result.adversarial_review is None
+    assert result.execution is None
+    assert result.metadata.get("cot_audit", {}).get("detected") is True
+
+
 def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -410,7 +454,6 @@ def test_apex_run_text_mode_baseline_downgrades_high_verified(monkeypatch: pytes
     monkeypatch.setattr(orchestrator, "review_text", fake_review_text)
     monkeypatch.setattr(orchestrator, "text_convergence", lambda variants: 0.99)
     monkeypatch.setattr(orchestrator, "select_best_text", lambda variants: 0)
-    monkeypatch.setattr(orchestrator, "decide_verdict", lambda signals: "high_verified")
 
     # Baseline is intentionally far from "EXPECTED OUTPUT".
     result = asyncio.run(
@@ -426,4 +469,62 @@ def test_apex_run_text_mode_baseline_downgrades_high_verified(monkeypatch: pytes
 
     assert result.verdict == "needs_review"
     assert result.metadata["baseline_similarity"] is not None
+    assert result.output == "EXPECTED OUTPUT"
+
+
+def test_apex_run_code_mode_baseline_downgrades_high_verified(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [_solution_bundle()]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        return _tests_bundle(1 if suite_label == "tests_v1" else 2)
+
+    async def fake_review_code(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [True, True]
+        return AdversarialReview(
+            findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
+        )
+
+    class _FakeBackend:
+        async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
+            return ExecutionResult(
+                **{"pass": True},
+                stdout="ok",
+                stderr="",
+                duration_ms=1,
+            )
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+            known_good_baseline="COMPLETELY DIFFERENT BASELINE TEXT",
+        )
+    )
+
+    assert result.verdict == "needs_review"
+    assert result.metadata["baseline_similarity"] is not None
+    assert result.execution is not None
 

@@ -144,7 +144,7 @@ async def _run_text_mode(
     ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
 
     cot_text = candidate.answer + "\n" + "\n".join(candidate.key_claims)
-    cot_findings = audit_chain_of_thought(cot_text)
+    cot_findings = audit_chain_of_thought(cot_text, context="text")
     if cot_findings:
         return _blocked_code_result(
             output="APEX blocked: chain-of-thought leakage detected",
@@ -241,6 +241,27 @@ async def _run_code_mode(
     best_i = select_best_code(solutions)
     solution = solutions[best_i]
     ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
+
+    cot_code_text = _format_solution(solution)
+    cot_findings = audit_chain_of_thought(cot_code_text, context="code")
+    if cot_findings:
+        return _blocked_code_result(
+            output="APEX blocked: chain-of-thought leakage detected",
+            error="cot_findings=" + ",".join(cot_findings),
+            actual_mode=actual_mode,
+            ensemble_runs=ensemble_runs,
+            code_ground_truth=code_ground_truth,
+            run_id=run_id,
+            llm_model=client.model,
+            timings_ms={
+                "ensemble": ensemble_ms,
+                "tests": None,
+                "adversarial": None,
+                "execution": None,
+                "total": int((time.perf_counter() - t_total_start) * 1000),
+            },
+            extra_metadata={"cot_audit": {"detected": True, "findings": cot_findings}},
+        )
 
     tests_v2_task = None
     tests_v2_start = None

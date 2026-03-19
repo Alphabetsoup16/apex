@@ -10,8 +10,11 @@ _COT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("let_s_think", re.compile(r"\blet'?s think\b", re.IGNORECASE)),
 ]
 
+_TEXT_PATTERNS = _COT_PATTERNS
+_CODE_PATTERNS = [p for p in _COT_PATTERNS if p[0] != "thought_colon_marker"]
 
-def audit_chain_of_thought(text: str) -> list[str]:
+
+def audit_chain_of_thought(text: str, *, context: str = "text") -> list[str]:
     """
     Lightweight chain-of-thought leakage auditing.
 
@@ -21,8 +24,9 @@ def audit_chain_of_thought(text: str) -> list[str]:
     if not text:
         return []
 
+    patterns = _TEXT_PATTERNS if context == "text" else _CODE_PATTERNS
     findings: list[str] = []
-    for name, pat in _COT_PATTERNS:
+    for name, pat in patterns:
         if pat.search(text):
             findings.append(name)
     return findings

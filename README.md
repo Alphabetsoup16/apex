@@ -176,7 +176,10 @@ When APEX calls the backend, it also includes conservative capability flags in `
 
 ## Chain-of-Thought Auditing
 
-APEX blocks runs when it detects common chain-of-thought leakage markers in text mode (`answer` and `key_claims`).
+APEX blocks runs when it detects common chain-of-thought leakage markers in either:
+
+- text mode (`answer` and `key_claims`)
+- code mode (generated solution code content)
 
 ## Security Notes
 
