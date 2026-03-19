@@ -104,6 +104,7 @@ Tool parameters:
 - `prompt` (string)
 - `mode` (default `auto`; `auto` infers `text` vs `code`)
 - `code_ground_truth` (default `false`; only affects `mode=code`)
+- `known_good_baseline` (optional string)
 - `ensemble_runs` (default `3`)
 - `max_tokens` (default `1024`)
 
@@ -172,6 +173,10 @@ When APEX calls the backend, it also includes conservative capability flags in `
 - `allow_network` (default `false`)
 - `allow_filesystem_write` (default `false`)
 - `allow_dependency_install` (default `false`)
+
+## Chain-of-Thought Auditing
+
+APEX blocks runs when it detects common chain-of-thought leakage markers in text mode (`answer` and `key_claims`).
 
 ## Security Notes
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import contextlib
 import time
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from apex.adversarial_review import review_code, review_text
 from apex.ensemble import (
@@ -36,6 +37,7 @@ from apex.code_ground_truth.executor_client import (
     ExecutionLimits,
     load_execution_backend_from_env,
 )
+from apex.safety.cot_audit import audit_chain_of_thought
 
 
 def infer_mode_from_prompt(prompt: str) -> Literal["text", "code"]:
@@ -88,6 +90,7 @@ def _blocked_code_result(
     run_id: str,
     llm_model: str,
     timings_ms: dict[str, int | None],
+    extra_metadata: dict[str, Any] | None = None,
 ) -> ApexRunToolResult:
     return ApexRunToolResult(
         verdict="blocked",
@@ -102,8 +105,23 @@ def _blocked_code_result(
             "llm_model": llm_model,
             "error": error,
             "timings_ms": timings_ms,
+            **(extra_metadata or {}),
         },
     )
+
+
+def _normalize_for_similarity(s: str) -> str:
+    return " ".join((s or "").split())
+
+
+def _sequence_similarity(a: str, b: str) -> float:
+    a_norm = _normalize_for_similarity(a)
+    b_norm = _normalize_for_similarity(b)
+    if not a_norm and not b_norm:
+        return 1.0
+    if not a_norm or not b_norm:
+        return 0.0
+    return difflib.SequenceMatcher(a=a_norm, b=b_norm).ratio()
 
 
 async def _run_text_mode(
@@ -116,6 +134,7 @@ async def _run_text_mode(
     actual_mode: Literal["text", "code"],
     run_id: str,
     t_total_start: float,
+    known_good_baseline: str | None,
 ) -> ApexRunToolResult:
     t_ensemble_start = time.perf_counter()
     variants = await generate_text_variants(client=client, prompt=prompt, config=cfg)
@@ -123,6 +142,27 @@ async def _run_text_mode(
     best_i = select_best_text(variants)
     candidate = variants[best_i]
     ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
+
+    cot_text = candidate.answer + "\n" + "\n".join(candidate.key_claims)
+    cot_findings = audit_chain_of_thought(cot_text)
+    if cot_findings:
+        return _blocked_code_result(
+            output="APEX blocked: chain-of-thought leakage detected",
+            error="cot_findings=" + ",".join(cot_findings),
+            actual_mode=actual_mode,
+            ensemble_runs=ensemble_runs,
+            code_ground_truth=False,
+            run_id=run_id,
+            llm_model=client.model,
+            timings_ms={
+                "ensemble": ensemble_ms,
+                "tests": None,
+                "adversarial": None,
+                "execution": None,
+                "total": int((time.perf_counter() - t_total_start) * 1000),
+            },
+            extra_metadata={"cot_audit": {"detected": True, "findings": cot_findings}},
+        )
 
     t_adv_start = time.perf_counter()
     adversarial = await review_text(
@@ -147,6 +187,14 @@ async def _run_text_mode(
         )
     )
 
+    baseline_similarity: float | None = None
+    if known_good_baseline is not None:
+        baseline_similarity = _sequence_similarity(candidate.answer, known_good_baseline)
+        # If the candidate diverges strongly from the known-good baseline,
+        # downgrade even if ensemble/external signals look strong.
+        if verdict == "high_verified" and baseline_similarity < 0.8:
+            verdict = "needs_review"
+
     return ApexRunToolResult(
         verdict=verdict,
         output=candidate.answer,
@@ -157,6 +205,7 @@ async def _run_text_mode(
             "convergence": convergence,
             "run_id": run_id,
             "llm_model": client.model,
+            "baseline_similarity": baseline_similarity,
             "timings_ms": {
                 "ensemble": ensemble_ms,
                 "adversarial": adversarial_ms,
@@ -177,6 +226,7 @@ async def _run_code_mode(
     code_ground_truth: bool,
     run_id: str,
     t_total_start: float,
+    known_good_baseline: str | None,
 ) -> ApexRunToolResult:
     extraction_ok = True
     execution: ExecutionResult | None = None
@@ -371,6 +421,12 @@ async def _run_code_mode(
         )
     )
 
+    baseline_similarity: float | None = None
+    if known_good_baseline is not None:
+        baseline_similarity = _sequence_similarity(_format_solution(solution), known_good_baseline)
+        if verdict == "high_verified" and baseline_similarity < 0.8:
+            verdict = "needs_review"
+
     return ApexRunToolResult(
         verdict=verdict,
         output=_format_solution(solution),
@@ -386,6 +442,7 @@ async def _run_code_mode(
             else "spec_only",
             "run_id": run_id,
             "llm_model": client.model,
+            "baseline_similarity": baseline_similarity,
             "timings_ms": {
                 "ensemble": ensemble_ms,
                 "tests": (
@@ -411,6 +468,7 @@ async def apex_run(
     ensemble_runs: int = 3,
     max_tokens: int = 1024,
     code_ground_truth: bool = False,
+    known_good_baseline: str | None = None,
 ) -> ApexRunToolResult:
     run_id = str(uuid.uuid4())
     ensemble_runs = 2 if ensemble_runs < 2 else min(3, ensemble_runs)
@@ -442,6 +500,7 @@ async def apex_run(
                 actual_mode=actual_mode,
                 run_id=run_id,
                 t_total_start=t_total_start,
+                known_good_baseline=known_good_baseline,
             )
 
         # code mode (python)
@@ -455,6 +514,7 @@ async def apex_run(
             code_ground_truth=code_ground_truth,
             run_id=run_id,
             t_total_start=t_total_start,
+            known_good_baseline=known_good_baseline,
         )
     except asyncio.CancelledError:
         # Let structured cancellation propagate cleanly.

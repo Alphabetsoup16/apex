@@ -359,3 +359,71 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
     assert result.execution is not None
     assert result.execution.pass_ is True
 
+
+def test_apex_run_text_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+
+    async def fake_generate_text_variants(*, client, prompt: str, config):
+        return [
+            TextCompletion(answer="I think we should do this. chain-of-thought: ...", key_claims=["x"]),
+            TextCompletion(answer="safe answer", key_claims=["y"]),
+        ]
+
+    async def fake_review_text(**kwargs):
+        raise AssertionError("review_text should not be called when CoT leakage is detected")
+
+    monkeypatch.setattr(orchestrator, "generate_text_variants", fake_generate_text_variants)
+    monkeypatch.setattr(orchestrator, "review_text", fake_review_text)
+    monkeypatch.setattr(orchestrator, "text_convergence", lambda variants: 0.9)
+    monkeypatch.setattr(orchestrator, "select_best_text", lambda variants: 0)
+    monkeypatch.setattr(orchestrator, "decide_verdict", lambda signals: "high_verified")
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=False,
+            known_good_baseline="irrelevant",
+        )
+    )
+
+    assert result.verdict == "blocked"
+    assert result.adversarial_review is None
+    assert result.execution is None
+
+
+def test_apex_run_text_mode_baseline_downgrades_high_verified(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+
+    async def fake_generate_text_variants(*, client, prompt: str, config):
+        return [
+            TextCompletion(answer="EXPECTED OUTPUT", key_claims=["x"]),
+            TextCompletion(answer="OTHER OUTPUT", key_claims=["y"]),
+        ]
+
+    async def fake_review_text(*, client, task_prompt: str, candidate, max_tokens: int):
+        return AdversarialReview(findings=[])
+
+    monkeypatch.setattr(orchestrator, "generate_text_variants", fake_generate_text_variants)
+    monkeypatch.setattr(orchestrator, "review_text", fake_review_text)
+    monkeypatch.setattr(orchestrator, "text_convergence", lambda variants: 0.99)
+    monkeypatch.setattr(orchestrator, "select_best_text", lambda variants: 0)
+    monkeypatch.setattr(orchestrator, "decide_verdict", lambda signals: "high_verified")
+
+    # Baseline is intentionally far from "EXPECTED OUTPUT".
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=False,
+            known_good_baseline="COMPLETELY DIFFERENT BASELINE TEXT",
+        )
+    )
+
+    assert result.verdict == "needs_review"
+    assert result.metadata["baseline_similarity"] is not None
+
