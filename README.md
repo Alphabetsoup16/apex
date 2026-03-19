@@ -13,7 +13,11 @@ Verdicts:
 ## Requirements
 
 - Python `>= 3.10`
-- An Anthropic API key for `POST /v1/messages` calls
+- LLM provider (currently Anthropic-only):
+  - `APEX_LLM_PROVIDER` (default: `anthropic`)
+  - `ANTHROPIC_API_KEY`
+  - `ANTHROPIC_MODEL`
+  - optional `ANTHROPIC_BASE_URL` (default: `https://api.anthropic.com`)
 - (For code mode) an execution backend endpoint reachable from the APEX process
 
 ## Execution latency expectation
@@ -31,6 +35,7 @@ pip install -e .
 Set environment variables:
 
 ```bash
+export APEX_LLM_PROVIDER="anthropic"
 export ANTHROPIC_API_KEY="..."
 export ANTHROPIC_MODEL="claude-3-5-sonnet-latest"
 

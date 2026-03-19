@@ -4,6 +4,7 @@
       "command": "python3",
       "args": ["-m", "apex", "serve", "--transport", "stdio"],
       "env": {
+        "APEX_LLM_PROVIDER": "anthropic",
         "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
         "ANTHROPIC_MODEL": "${env:ANTHROPIC_MODEL}"
       }
