@@ -55,6 +55,7 @@ APEX exposes `apex.run` with:
 - `known_good_baseline` (optional similarity downgrade for `high_verified`)
 
 See:
+- [Architecture](docs/architecture.md)
 - [Tool interface contract](docs/tool-interface.md)
 - [Verification semantics](docs/verification.md)
 - [Code execution backend contract](docs/code-execution.md)

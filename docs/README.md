@@ -1,5 +1,6 @@
 # Documentation
 
+- [Architecture](architecture.md)
 - [Tool interface contract](tool-interface.md)
 - [Flow chart](flow.md)
 - [Verification semantics](verification.md)
