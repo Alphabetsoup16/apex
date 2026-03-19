@@ -35,6 +35,8 @@ Optional: enable executable verification for code mode:
 export APEX_EXECUTION_BACKEND_URL="http://localhost:8080/execute"
 ```
 
+Execution backend details: see [Code execution backend contract](docs/code-execution.md).
+
 Run APEX:
 
 ```bash
@@ -56,6 +58,11 @@ See:
 - [Code execution backend contract](docs/code-execution.md)
 - [Safety & auditing](docs/safety.md)
 - [Configuration](docs/configuration.md)
+
+## Limitations (Alpha)
+
+- `high_verified` in code mode requires `code_ground_truth=true` and a configured execution backend.
+- Doc-only inspection is best-effort; it does not replace running your real project test suite.
 
 ## Contributing
 
