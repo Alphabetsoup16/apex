@@ -14,4 +14,3 @@ def test_execute_url_appends_execute_when_missing():
 def test_execute_url_does_not_duplicate_execute_when_present():
     b = HttpExecutionBackend("http://example.com/api/execute")
     assert b._execute_url() == "http://example.com/api/execute"
-

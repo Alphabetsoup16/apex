@@ -119,7 +119,9 @@ def code_signature(solution: CodeSolution) -> tuple[str, ...]:
             for sub in node.body:
                 if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     methods.append(fn_sig(sub))
-            sig.append(f"class:{node.name}:methods:{len(methods)}:" + ",".join(sorted(set(methods))))
+            sig.append(
+                f"class:{node.name}:methods:{len(methods)}:" + ",".join(sorted(set(methods)))
+            )
 
     return tuple(sorted(sig))
 
@@ -215,4 +217,3 @@ def decide_verdict(signals: DecisionSignals) -> str:
             return "high_verified"
 
     return "needs_review"
-

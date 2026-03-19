@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from apex.models import CodeFile, ExecutionResult, StrictBaseModel
 
@@ -30,4 +30,3 @@ class ExecutionBackendResponse(ExecutionResult):
     timed_out: bool | None = None
     resource_stats: dict | None = None
     logs: str | None = None
-

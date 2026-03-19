@@ -6,4 +6,3 @@ from __future__ import annotations
 #
 # If you adjust this, update any documentation/tests that mention the threshold.
 BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD: float = 0.8
-

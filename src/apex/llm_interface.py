@@ -32,4 +32,3 @@ class LLMClient(Protocol):
         max_tokens: int,
         temperature: float,
     ) -> dict[str, Any]: ...
-

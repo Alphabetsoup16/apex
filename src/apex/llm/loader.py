@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 
-from apex.llm_interface import LLMClient
 from apex.llm.providers.anthropic_messages import AnthropicConfig, AnthropicMessagesClient
+from apex.llm_interface import LLMClient
 
 
 def load_llm_client_from_env() -> LLMClient:
@@ -26,7 +26,8 @@ def load_llm_client_from_env() -> LLMClient:
             raise RuntimeError("Missing required env var: ANTHROPIC_API_KEY")
         if not model:
             raise RuntimeError("Missing required env var: ANTHROPIC_MODEL")
-        return AnthropicMessagesClient(AnthropicConfig(api_key=api_key, model=model, base_url=base_url))
+        return AnthropicMessagesClient(
+            AnthropicConfig(api_key=api_key, model=model, base_url=base_url)
+        )
 
     raise RuntimeError(f"Unsupported LLM provider: {provider}")
-

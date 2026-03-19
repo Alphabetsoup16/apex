@@ -11,7 +11,9 @@ from apex.models import CodeFile, CodeSolution, CodeTests
 
 def test_backend_request_serializes_expected_fields():
     sol = CodeSolution(files=[CodeFile(path="solution.py", content="def f():\n    return 1\n")])
-    tests = CodeTests(files=[CodeFile(path="test_solution.py", content="def test_ok():\n    assert True\n")])
+    tests = CodeTests(
+        files=[CodeFile(path="test_solution.py", content="def test_ok():\n    assert True\n")]
+    )
     req = ExecutionBackendRequest(
         run_id="run_1",
         files=sol.files,
@@ -50,4 +52,3 @@ def test_backend_response_alias_pass():
         {"pass": True, "stdout": "ok", "stderr": "", "duration_ms": 123}
     )
     assert resp.pass_ is True
-

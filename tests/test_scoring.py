@@ -1,6 +1,5 @@
-from apex.models import TextCompletion
+from apex.models import CodeFile, CodeSolution, TextCompletion
 from apex.scoring import DecisionSignals, code_signature, decide_verdict, text_convergence
-from apex.models import CodeFile, CodeSolution
 
 
 def test_text_convergence_identical_answers_and_claims():
@@ -42,4 +41,3 @@ def test_decide_verdict_code_no_execution_downgrades():
         extraction_ok=True,
     )
     assert decide_verdict(signals) == "needs_review"
-

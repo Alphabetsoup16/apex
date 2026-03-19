@@ -3,11 +3,9 @@ from __future__ import annotations
 import asyncio
 import os
 from dataclasses import dataclass
-from typing import Tuple
 
-from apex.models import CodeSolution, CodeTests, TextCompletion
 from apex.llm_interface import LLMClient
-
+from apex.models import CodeSolution, CodeTests, TextCompletion
 
 _TEXT_SYSTEM_PROMPT = """\
 You are APEX, a verification-oriented assistant.
@@ -53,7 +51,7 @@ Rules:
 @dataclass(frozen=True)
 class EnsembleConfig:
     runs: int
-    temperatures: Tuple[float, ...]
+    temperatures: tuple[float, ...]
     max_tokens: int
 
 
@@ -112,10 +110,7 @@ async def generate_code_tests(
     temperature: float = 0.2,
 ) -> CodeTests:
     # Tests are spec-derived only; we avoid including any code in the prompt here.
-    user = (
-        f"Task requirements:\n{prompt}\n\n"
-        f"Now write pytest tests for {suite_label}."
-    )
+    user = f"Task requirements:\n{prompt}\n\nNow write pytest tests for {suite_label}."
     payload = await client.complete_json_object(
         system=_CODE_TESTS_SYSTEM_PROMPT,
         user=user,
@@ -124,4 +119,3 @@ async def generate_code_tests(
     )
     # Convert payload dict -> validated model
     return CodeTests.model_validate(payload)
-

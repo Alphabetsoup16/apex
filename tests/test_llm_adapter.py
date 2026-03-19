@@ -94,4 +94,3 @@ def test_generate_text_variants_calls_two_runs_with_temperatures():
     variants = asyncio.run(_run())
     assert [v.answer for v in variants] == ["A", "B"]
     assert [c["temperature"] for c in fake.calls] == [0.2, 0.8]
-

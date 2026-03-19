@@ -1,32 +1,39 @@
 from __future__ import annotations
 
 import asyncio
-import difflib
 import contextlib
+import difflib
 import time
 import uuid
 from typing import Any, Literal
 
+from apex.adversarial_review import review_code, review_text
+from apex.code_ground_truth.executor_client import (
+    ExecutionBackendError,
+    ExecutionLimits,
+    load_execution_backend_from_env,
+)
 from apex.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.conventions import load_effective_conventions
-from apex.adversarial_review import review_code, review_text
-from apex.models import AdversarialReview
-from apex.policy import load_findings_policy
 from apex.ensemble import (
     EnsembleConfig,
     generate_code_solution_variants,
     generate_code_tests,
     generate_text_variants,
 )
+from apex.inspection_review import inspect_code_doc_only
 from apex.llm.loader import load_llm_client_from_env
 from apex.models import (
+    AdversarialReview,
     ApexRunToolResult,
     CodeSolution,
     CodeTests,
     ExecutionResult,
     Mode,
-    TextCompletion,
 )
+from apex.policy import load_findings_policy
+from apex.review_pack import build_pr_review_pack
+from apex.safety.cot_audit import audit_chain_of_thought
 from apex.scoring import (
     DecisionSignals,
     code_convergence,
@@ -35,15 +42,6 @@ from apex.scoring import (
     select_best_text,
     text_convergence,
 )
-
-from apex.code_ground_truth.executor_client import (
-    ExecutionBackendError,
-    ExecutionLimits,
-    load_execution_backend_from_env,
-)
-from apex.inspection_review import inspect_code_doc_only
-from apex.review_pack import build_pr_review_pack
-from apex.safety.cot_audit import audit_chain_of_thought
 
 
 def infer_mode_from_prompt(prompt: str) -> Literal["text", "code"]:
@@ -202,7 +200,10 @@ async def _run_text_mode(
         baseline_similarity = _sequence_similarity(candidate.answer, known_good_baseline)
         # If the candidate diverges strongly from the known-good baseline,
         # downgrade even if ensemble/external signals look strong.
-        if verdict == "high_verified" and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD:
+        if (
+            verdict == "high_verified"
+            and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
+        ):
             verdict = "needs_review"
 
     return ApexRunToolResult(
@@ -342,9 +343,7 @@ async def _run_code_mode(
             },
         )
 
-    tests_files_by_suite = [
-        [{"path": f.path, "content": f.content} for f in tests_v1.files]
-    ]
+    tests_files_by_suite = [[{"path": f.path, "content": f.content} for f in tests_v1.files]]
 
     execution_passes: list[bool | None] | None = None
     execution_pass: bool | None = None
@@ -390,6 +389,7 @@ async def _run_code_mode(
             execution_passes = [None, None]
             execution_pass = None
         else:
+
             async def _exec_suite(
                 suite_idx: int, suite_tests: CodeTests
             ) -> tuple[bool | None, int | None, ExecutionResult | None]:
@@ -434,9 +434,7 @@ async def _run_code_mode(
             execution_ms_per_suite = per_suite_ms
             execution_results_any = any(r is not None for r in execution_results)
             execution_ms = (
-                sum(ms for ms in per_suite_ms if ms is not None)
-                if execution_results_any
-                else None
+                sum(ms for ms in per_suite_ms if ms is not None) if execution_results_any else None
             )
             execution = execution_results[0] if execution_results_any else None
 
@@ -507,7 +505,10 @@ async def _run_code_mode(
     baseline_similarity: float | None = None
     if known_good_baseline is not None:
         baseline_similarity = _sequence_similarity(_format_solution(solution), known_good_baseline)
-        if verdict == "high_verified" and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD:
+        if (
+            verdict == "high_verified"
+            and baseline_similarity < BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
+        ):
             verdict = "needs_review"
 
     return ApexRunToolResult(
@@ -532,9 +533,7 @@ async def _run_code_mode(
             "ensemble_runs": ensemble_runs,
             "convergence": convergence,
             "ground_truth_enabled": code_ground_truth,
-            "verification_scale": "execution_ground_truth"
-            if code_ground_truth
-            else "spec_only",
+            "verification_scale": "execution_ground_truth" if code_ground_truth else "spec_only",
             "run_id": run_id,
             "llm_model": client.model,
             "baseline_similarity": baseline_similarity,
@@ -584,11 +583,6 @@ async def apex_run(
     client = load_llm_client_from_env()
     effective_conventions = load_effective_conventions(repo_conventions=repo_conventions)
 
-    extraction_ok = True
-    execution: ExecutionResult | None = None
-    adversarial = None
-    convergence = 0.0
-
     try:
         t_total_start = time.perf_counter()
         temps = _temperatures_for_runs(ensemble_runs)
@@ -633,13 +627,10 @@ async def apex_run(
         raise
     except Exception as e:
         # Hard fail if we can't even parse/validate the LLM outputs.
-        extraction_ok = False
-        adversarial = None
         return ApexRunToolResult(
             verdict="blocked",
             output=f"APEX blocked due to extraction/verification failure: {type(e).__name__}",
-            adversarial_review=adversarial,
+            adversarial_review=None,
             execution=None,
             metadata={"error": str(e)[:2000], "run_id": run_id},
         )
-

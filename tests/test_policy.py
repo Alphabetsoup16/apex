@@ -35,4 +35,3 @@ def test_findings_policy_filters_by_type_and_severity() -> None:
     out = p.apply(review)
 
     assert [f.evidence for f in out.findings] == ["A"]
-

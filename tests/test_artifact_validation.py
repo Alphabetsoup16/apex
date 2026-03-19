@@ -22,6 +22,7 @@ def test_validate_code_bundles_missing_test_solution_py():
 
 def test_validate_code_bundles_ok():
     sol = CodeSolution(files=[CodeFile(path="solution.py", content="def f():\n    return 1")])
-    tests = CodeTests(files=[CodeFile(path="test_solution.py", content="def test_f():\n    assert True")])
+    tests = CodeTests(
+        files=[CodeFile(path="test_solution.py", content="def test_f():\n    assert True")]
+    )
     validate_code_bundles(sol, tests)
-

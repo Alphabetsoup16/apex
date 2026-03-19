@@ -92,4 +92,3 @@ def build_pr_review_pack(
     lines.append(truncated)
 
     return "\n".join(lines).strip() + "\n"
-

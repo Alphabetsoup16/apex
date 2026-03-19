@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-import os
-import time
 import asyncio
+import os
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 from pydantic import ValidationError
 
-from apex.models import CodeSolution, CodeTests, ExecutionResult
 from apex.code_ground_truth.backend_contract import (
     ExecutionBackendLimits,
     ExecutionBackendRequest,
     ExecutionBackendResponse,
 )
+from apex.models import CodeSolution, CodeTests, ExecutionResult
 
 
 @dataclass(frozen=True)
@@ -107,10 +106,11 @@ def load_execution_backend_from_env() -> HttpExecutionBackend:
             "APEX_EXECUTION_BACKEND_URL is not set; code-mode execution is unavailable."
         )
     api_key = os.environ.get("APEX_EXECUTION_BACKEND_API_KEY", "").strip()
-    auth_header_name = os.environ.get("APEX_EXECUTION_BACKEND_AUTH_HEADER", "").strip() or "Authorization"
+    auth_header_name = (
+        os.environ.get("APEX_EXECUTION_BACKEND_AUTH_HEADER", "").strip() or "Authorization"
+    )
     auth_headers: dict[str, str] = {}
     if api_key:
         auth_headers[auth_header_name] = f"Bearer {api_key}"
 
     return HttpExecutionBackend(backend_url, auth_headers=auth_headers)
-

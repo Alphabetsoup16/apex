@@ -80,7 +80,11 @@ async def inspect_code_doc_only(
 
     user = (
         (f"Language:\n{language}\n\n" if language else "")
-        + (f"Repo conventions:\n{_truncate(repo_conventions, max_chars=2000)}\n\n" if repo_conventions else "")
+        + (
+            f"Repo conventions:\n{_truncate(repo_conventions, max_chars=2000)}\n\n"
+            if repo_conventions
+            else ""
+        )
         + f"Task requirements:\n{task_prompt}\n\n"
         + f"Candidate code (may be truncated):\n{solution_files}"
         f"{tests_info}"
@@ -96,4 +100,3 @@ async def inspect_code_doc_only(
         temperature=0.0,
     )
     return AdversarialReview.model_validate(payload)
-

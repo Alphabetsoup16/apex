@@ -7,7 +7,6 @@ from typing import Any
 
 import httpx
 
-from apex.llm_interface import LLMClient
 from apex.safety.redaction import redact_secrets
 from apex.safety.validators import extract_first_json_object
 
@@ -110,4 +109,3 @@ class AnthropicMessagesClient:
                 )
 
         raise RuntimeError(f"Failed to obtain valid JSON from model: {parse_err}") from parse_err
-

@@ -66,4 +66,3 @@ class ApexRunToolResult(StrictBaseModel):
     metadata: dict = Field(default_factory=dict)
     adversarial_review: AdversarialReview | None = None
     execution: ExecutionResult | None = None
-

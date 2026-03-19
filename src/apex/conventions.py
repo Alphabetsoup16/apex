@@ -58,4 +58,3 @@ def load_effective_conventions(
 
     merged = "\n\n".join(parts).strip()
     return merged or None
-

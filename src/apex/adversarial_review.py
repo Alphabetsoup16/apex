@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from apex.models import AdversarialReview, CodeSolution, TextCompletion
 from apex.llm_interface import LLMClient
-
+from apex.models import AdversarialReview, CodeSolution, TextCompletion
 
 _ADVERSARIAL_SYSTEM_PROMPT = """\
 You are a senior adversarial reviewer.
@@ -74,17 +73,13 @@ async def review_code(
     execution_passes: list[bool | None] | None,
     max_tokens: int,
 ) -> AdversarialReview:
-    solution_files = "\n".join(
-        [f"--- {f.path} ---\n{f.content}" for f in candidate.files]
-    )
+    solution_files = "\n".join([f"--- {f.path} ---\n{f.content}" for f in candidate.files])
 
     tests_info = ""
     if tests_files_by_suite is not None:
         suite_sections: list[str] = []
         for idx, suite in enumerate(tests_files_by_suite):
-            joined = "\n".join(
-                [f"--- {f['path']} ---\n{f['content']}" for f in suite]
-            )
+            joined = "\n".join([f"--- {f['path']} ---\n{f['content']}" for f in suite])
             suite_sections.append(f"\nCandidate tests suite {idx}:\n{joined}")
         tests_info = "\n\n" + "\n".join(suite_sections).strip()
 
@@ -111,4 +106,3 @@ async def review_code(
         temperature=0.0,
     )
     return AdversarialReview.model_validate(payload)
-

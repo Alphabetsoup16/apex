@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def extract_first_json_object(text: str) -> str:
     """
     Extract the first top-level JSON object from a string.
@@ -38,4 +39,3 @@ def extract_first_json_object(text: str) -> str:
                 return text[start : i + 1]
 
     raise ValueError("JSON object not closed")
-

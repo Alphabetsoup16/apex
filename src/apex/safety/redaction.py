@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 _SECRET_PATTERNS: list[re.Pattern[str]] = [
     # Common LLM provider API keys / tokens (heuristic)
     re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
@@ -25,4 +24,3 @@ def redact_secrets(text: str) -> str:
     for pat in _SECRET_PATTERNS:
         redacted = pat.sub("[REDACTED]", redacted)
     return redacted
-

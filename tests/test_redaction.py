@@ -13,4 +13,3 @@ def test_redact_password_assignment():
     out = redact_secrets(text)
     assert "hunter2" not in out
     assert "password=" not in out or "[REDACTED]" in out
-

@@ -48,4 +48,3 @@ def create_mcp_server() -> FastMCP:
         return result.model_dump(by_alias=True)
 
     return mcp
-

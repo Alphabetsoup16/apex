@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from apex import orchestrator
 from apex.code_ground_truth.executor_client import ExecutionBackendError
 from apex.models import (
     AdversarialReview,
@@ -13,7 +14,6 @@ from apex.models import (
     Finding,
     TextCompletion,
 )
-from apex import orchestrator
 
 
 class _FakeClient:
@@ -87,7 +87,9 @@ def test_apex_run_text_mode_uses_review_and_sets_signals(monkeypatch: pytest.Mon
     assert captured["signals"].execution_pass is None
 
 
-def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeypatch: pytest.MonkeyPatch):
+def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.7)
     monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
@@ -98,7 +100,9 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeyp
         assert hasattr(config, "runs")
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         assert client.model == "fake-code"
         assert suite_label in ("tests_v1", "tests_v2")
         v = 1 if suite_label == "tests_v1" else 2
@@ -125,12 +129,15 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeyp
         return AdversarialReview(findings=[])
 
     def fake_decide_verdict(signals):
-        # Core behavioral contract: code mode requests execution, but backend failure yields `execution_pass=None`.
+        # Core behavioral contract: code mode requests execution,
+        # but backend failure yields `execution_pass=None`.
         assert signals.execution_required is True
         assert signals.execution_pass is None
         return "needs_review"
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -139,7 +146,9 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeyp
     def fake_load_execution_backend_from_env():
         raise ExecutionBackendError("backend unavailable in test")
 
-    monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", fake_load_execution_backend_from_env)
+    monkeypatch.setattr(
+        orchestrator, "load_execution_backend_from_env", fake_load_execution_backend_from_env
+    )
 
     result = asyncio.run(
         orchestrator.apex_run(
@@ -158,7 +167,9 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(monkeyp
     assert result.execution is None
 
 
-def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monkeypatch: pytest.MonkeyPatch):
+def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.7)
     monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
@@ -166,7 +177,9 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         v = 1 if suite_label == "tests_v1" else 2
         return _tests_bundle(v)
 
@@ -191,9 +204,7 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
     class _FakeBackend:
         async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
             # Always pass to ensure `execution_pass=True`.
-            return ExecutionResult(
-                **{"pass": True}, stdout="ok", stderr="", duration_ms=1
-            )
+            return ExecutionResult(**{"pass": True}, stdout="ok", stderr="", duration_ms=1)
 
     captured = {}
 
@@ -204,7 +215,9 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
         assert signals.adversarial_high is False
         return "high_verified"
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -235,7 +248,9 @@ def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         return _tests_bundle(1 if suite_label == "tests_v1" else 2)
 
     async def fake_review_code(**kwargs):
@@ -243,14 +258,18 @@ def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
 
     async def fake_inspect_code_doc_only(**kwargs):
         return AdversarialReview(
-            findings=[Finding(severity="medium", type="structure", confidence=0.7, evidence="duplication")]
+            findings=[
+                Finding(severity="medium", type="structure", confidence=0.7, evidence="duplication")
+            ]
         )
 
     class _FakeBackend:
         async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
             return ExecutionResult(**{"pass": True}, stdout="ok", stderr="", duration_ms=1)
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -293,13 +312,17 @@ def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
             )
         ]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         raise AssertionError("generate_code_tests should not run when CoT leakage is detected")
 
     async def fake_review_code(**kwargs):
         raise AssertionError("review_code should not run when CoT leakage is detected")
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
 
@@ -329,7 +352,9 @@ def test_apex_run_code_mode_inspection_high_blocks_verdict(
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         v = 1 if suite_label == "tests_v1" else 2
         return _tests_bundle(v)
 
@@ -368,7 +393,9 @@ def test_apex_run_code_mode_inspection_high_blocks_verdict(
                 duration_ms=1,
             )
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -399,7 +426,9 @@ def test_apex_run_code_mode_inspection_medium_does_not_block(
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         v = 1 if suite_label == "tests_v1" else 2
         return _tests_bundle(v)
 
@@ -439,7 +468,9 @@ def test_apex_run_code_mode_inspection_medium_does_not_block(
                 duration_ms=1,
             )
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -471,7 +502,9 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
         assert client.model == "fake-code"
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         assert suite_label in ("tests_v1", "tests_v2")
         if suite_label == "tests_v1":
             # Missing `test_solution.py` should trigger `validate_code_bundles` failure.
@@ -491,7 +524,9 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
             "inspect_code_doc_only should not be called when tests bundle validation fails"
         )
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -521,12 +556,20 @@ def test_apex_run_code_ground_truth_false_never_high_verified(
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         assert suite_label == "tests_v1"
         return _tests_bundle(1)
 
     async def fake_review_code(
-        *, client, task_prompt: str, candidate, tests_files_by_suite, execution_passes, max_tokens: int
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
     ):
         assert execution_passes is None
         assert task_prompt.lower().startswith("write code")
@@ -539,7 +582,9 @@ def test_apex_run_code_ground_truth_false_never_high_verified(
         assert str(kwargs.get("task_prompt", "")).lower().startswith("write code")
         return AdversarialReview(findings=[])
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -569,13 +614,21 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         if suite_label == "tests_v1":
             return _tests_bundle(1)
         return _tests_bundle(2)
 
     async def fake_review_code(
-        *, client, task_prompt: str, candidate, tests_files_by_suite, execution_passes, max_tokens: int
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
     ):
         assert execution_passes == [True, False]
         return AdversarialReview(
@@ -599,7 +652,9 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
                 duration_ms=1,
             )
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -626,7 +681,9 @@ def test_apex_run_text_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         return [
-            TextCompletion(answer="I think we should do this. chain-of-thought: ...", key_claims=["x"]),
+            TextCompletion(
+                answer="I think we should do this. chain-of-thought: ...", key_claims=["x"]
+            ),
             TextCompletion(answer="safe answer", key_claims=["y"]),
         ]
 
@@ -699,7 +756,9 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
 
-    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
         return _tests_bundle(1 if suite_label == "tests_v1" else 2)
 
     async def fake_review_code(
@@ -729,7 +788,9 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
                 duration_ms=1,
             )
 
-    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(
+        orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
     monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
     monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
     monkeypatch.setattr(orchestrator, "inspect_code_doc_only", fake_inspect_code_doc_only)
@@ -749,4 +810,3 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
     assert result.verdict == "needs_review"
     assert result.metadata["baseline_similarity"] is not None
     assert result.execution is not None
-

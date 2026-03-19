@@ -73,4 +73,3 @@ def load_findings_policy(*, repo_root: str | None = None) -> FindingsPolicy:
         str(x) for x in (merged.get("ignored_severities") or []) if str(x).strip()
     )
     return FindingsPolicy(ignored_types=ignored_types, ignored_severities=ignored_severities)
-

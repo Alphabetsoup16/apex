@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 _COT_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("chain_of_thought_phrase", re.compile(r"chain[- ]of[- ]thought", re.IGNORECASE)),
     ("as_an_ai_phrase", re.compile(r"\b(as an ai|i am an ai)\b", re.IGNORECASE)),
@@ -30,4 +29,3 @@ def audit_chain_of_thought(text: str, *, context: str = "text") -> list[str]:
         if pat.search(text):
             findings.append(name)
     return findings
-
