@@ -1,5 +1,11 @@
 # Verification Semantics
 
+## Scope: light vs CI
+
+APEX is optimized for **high-leverage, low-latency** verification while you are authoring or reviewing an LLM output: convergence, structured adversarial/inspection findings, optional baseline comparison, and (if enabled) a **bounded** execution check via your backend.
+
+**Medium/heavy assurance**—running the full repo test suite, production-like integration tests, builds, CodeQL, SonarQube, Snyk, etc.—is expected to run in your **existing CI** when code is pushed. APEX complements that by making the *human* review step sharper; it is not a substitute for org-wide CI gates.
+
 APEX produces a result by combining three signals:
 
 1. Ensemble generation (multi-path convergence)

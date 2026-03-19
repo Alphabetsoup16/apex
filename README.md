@@ -6,6 +6,8 @@ APEX is an MCP server that verifies LLM outputs using a layered pipeline:
 - Adversarial review (structured findings)
 - Optional executable ground truth for code (sandboxed backend; two independent pytest suites)
 
+**Design focus:** APEX is tuned for the **light layer**—fast, diff-aware review amplification (ensemble + adversarial + inspection + optional small execution) so humans know *what to scrutinize*. Broader assurance—full test matrices, builds, SAST/DAST, dependency scanning, SonarQube, CodeQL, etc.—belongs in **CI** (e.g. GitHub Actions) on push/PR; APEX does not try to replace that pipeline.
+
 ## Verdicts
 
 - `high_verified`: strong agreement + (when enabled) execution ground truth passed
@@ -66,10 +68,11 @@ See:
 
 ## Contributing
 
-Run tests:
+Lint and test:
 
 ```bash
-PYTHONPATH=src:vendor pytest
+make check
+# or: PYTHONPATH=src:vendor python3 -m pytest -q
 ```
 
 Report issues and propose improvements via GitHub PRs.
