@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 import uuid
 from typing import Literal
@@ -219,6 +220,12 @@ async def _run_code_mode(
         validate_code_bundles(solution, tests_v1)
     except ValueError as ve:
         extraction_ok = False
+        # If we scheduled tests_v2, cancel it to avoid leaving a pending task
+        # around when we return early due to invalid tests_v1.
+        if tests_v2_task is not None:
+            tests_v2_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await tests_v2_task
         return _blocked_code_result(
             output=f"APEX blocked: {ve}",
             error=str(ve),
@@ -299,6 +306,8 @@ async def _run_code_mode(
                     return exec_result.pass_, ms, exec_result
                 except ExecutionBackendError:
                     return None, None, None
+                except asyncio.CancelledError:
+                    raise
                 except Exception:
                     return False, None, None
 
@@ -447,220 +456,9 @@ async def apex_run(
             run_id=run_id,
             t_total_start=t_total_start,
         )
-        t_ensemble_start = time.perf_counter()
-        solutions: list[CodeSolution] = await generate_code_solution_variants(
-            client=client, prompt=prompt, config=cfg
-        )
-        convergence = code_convergence(solutions)
-        best_i = select_best_code(solutions)
-        solution = solutions[best_i]
-        ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
-
-        tests_v2_task = None
-        tests_v2_start = None
-        if code_ground_truth:
-            tests_v2_start = time.perf_counter()
-            tests_v2_task = asyncio.create_task(
-                generate_code_tests(
-                    client=client,
-                    prompt=prompt,
-                    config=cfg,
-                    suite_label="tests_v2",
-                    temperature=0.5,
-                )
-            )
-
-        t_tests_start = time.perf_counter()
-        tests_v1 = await generate_code_tests(
-            client=client,
-            prompt=prompt,
-            config=cfg,
-            suite_label="tests_v1",
-            temperature=0.2,
-        )
-        tests_v1_ms = int((time.perf_counter() - t_tests_start) * 1000)
-
-        try:
-            validate_code_bundles(solution, tests_v1)
-        except ValueError as ve:
-            extraction_ok = False
-            return _blocked_code_result(
-                output=f"APEX blocked: {ve}",
-                error=str(ve),
-                actual_mode=actual_mode,
-                ensemble_runs=ensemble_runs,
-                code_ground_truth=code_ground_truth,
-                run_id=run_id,
-                llm_model=client.model,
-                timings_ms={
-                    "ensemble": ensemble_ms,
-                    "tests": tests_v1_ms,
-                    "adversarial": None,
-                    "execution": None,
-                    "total": int((time.perf_counter() - t_total_start) * 1000),
-                },
-            )
-
-        tests_files_by_suite = [
-            [{"path": f.path, "content": f.content} for f in tests_v1.files]
-        ]
-
-        execution_passes: list[bool | None] | None = None
-        execution_pass: bool | None = None
-        execution_ms: int | None = None
-        execution_ms_per_suite: list[int | None] | None = None
-        tests_ms_per_suite: list[int] | None = None
-
-        if code_ground_truth:
-            if tests_v2_task is None or tests_v2_start is None:
-                raise RuntimeError("Internal error: tests_v2 not scheduled")
-            tests_v2 = await tests_v2_task
-            tests_v2_ms = int((time.perf_counter() - tests_v2_start) * 1000)
-
-            try:
-                validate_code_bundles(solution, tests_v2)
-            except ValueError as ve:
-                extraction_ok = False
-                return _blocked_code_result(
-                    output=f"APEX blocked: {ve}",
-                    error=str(ve),
-                    actual_mode=actual_mode,
-                    ensemble_runs=ensemble_runs,
-                    code_ground_truth=code_ground_truth,
-                    run_id=run_id,
-                    llm_model=client.model,
-                    timings_ms={
-                        "ensemble": ensemble_ms,
-                        "tests": tests_v1_ms + tests_v2_ms,
-                        "adversarial": None,
-                        "execution": None,
-                        "total": int(
-                            (time.perf_counter() - t_total_start) * 1000
-                        ),
-                    },
-                )
-
-            tests_files_by_suite.append(
-                [{"path": f.path, "content": f.content} for f in tests_v2.files]
-            )
-            tests_ms_per_suite = [tests_v1_ms, tests_v2_ms]
-
-            # Execute both suites.
-            try:
-                backend = load_execution_backend_from_env()
-            except ExecutionBackendError:
-                execution_passes = [None, None]
-                execution_pass = None
-            else:
-                async def _exec_suite(
-                    suite_idx: int, suite_tests: CodeTests
-                ) -> tuple[bool | None, int | None, ExecutionResult | None]:
-                    t_exec_start = time.perf_counter()
-                    try:
-                        exec_result = await backend.execute(
-                            run_id=f"{run_id}-suite{suite_idx}",
-                            solution=solution,
-                            tests=suite_tests,
-                            limits=ExecutionLimits(),
-                        )
-                        ms = int((time.perf_counter() - t_exec_start) * 1000)
-                        return exec_result.pass_, ms, exec_result
-                    except ExecutionBackendError:
-                        return None, None, None
-                    except Exception:
-                        return False, None, None
-
-                exec_tasks = [
-                    asyncio.create_task(_exec_suite(0, tests_v1)),
-                    asyncio.create_task(_exec_suite(1, tests_v2)),
-                ]
-                exec_results: list[
-                    tuple[bool | None, int | None, ExecutionResult | None]
-                ] = await asyncio.gather(*exec_tasks)
-
-                per_suite_passes = [r[0] for r in exec_results]
-                per_suite_ms = [r[1] for r in exec_results]
-                execution_results = [r[2] for r in exec_results]
-
-                execution_passes = per_suite_passes
-                execution_pass = (
-                    False
-                    if any(p is False for p in per_suite_passes)
-                    else True
-                    if all(p is True for p in per_suite_passes)
-                    else None
-                )
-
-                execution_ms_per_suite = per_suite_ms
-                tests_ms_per_suite = [tests_v1_ms, tests_v2_ms]
-                execution_results_any = any(r is not None for r in execution_results)
-                execution_ms = (
-                    sum(ms for ms in per_suite_ms if ms is not None)
-                    if execution_results_any
-                    else None
-                )
-                execution = execution_results[0] if execution_results_any else None
-        else:
-            execution_pass = None
-
-        t_adv_start = time.perf_counter()
-        adversarial = await review_code(
-            client=client,
-            task_prompt=prompt,
-            candidate=solution,
-            tests_files_by_suite=tests_files_by_suite,
-            execution_passes=execution_passes,
-            max_tokens=min(512, max_tokens),
-        )
-        adversarial_ms = int((time.perf_counter() - t_adv_start) * 1000)
-
-        high = any(f.severity == "high" for f in adversarial.findings)
-        medium = any(f.severity == "medium" for f in adversarial.findings)
-
-        verdict = decide_verdict(
-            DecisionSignals(
-                convergence=convergence,
-                adversarial_high=high,
-                adversarial_medium=medium,
-                execution_pass=execution_pass,
-                # Principal policy: for code, "high_verified" is only allowed when
-                # we actually ran sandbox execution (execution_pass is True).
-                # If execution is disabled, execution_pass stays None, which forces
-                # the verdict to downgrade to `needs_review`.
-                execution_required=True,
-                extraction_ok=extraction_ok,
-            )
-        )
-
-        return ApexRunToolResult(
-            verdict=verdict,
-            output=_format_solution(solution),
-            adversarial_review=adversarial,
-            execution=execution,
-            metadata={
-                "mode": actual_mode,
-                "ensemble_runs": ensemble_runs,
-                "convergence": convergence,
-                "ground_truth_enabled": code_ground_truth,
-                "verification_scale": "execution_ground_truth" if code_ground_truth else "spec_only",
-                "run_id": run_id,
-                "llm_model": client.model,
-                "timings_ms": {
-                    "ensemble": ensemble_ms,
-                    "tests": (
-                        (tests_ms_per_suite[0] + tests_ms_per_suite[1])
-                        if tests_ms_per_suite is not None
-                        else tests_v1_ms
-                    ),
-                    "adversarial": adversarial_ms,
-                    "execution": execution_ms,
-                    "total": int((time.perf_counter() - t_total_start) * 1000),
-                },
-                "execution_passes": execution_passes,
-                "tests_ms_per_suite": tests_ms_per_suite,
-                "execution_ms_per_suite": execution_ms_per_suite,
-            },
-        )
+    except asyncio.CancelledError:
+        # Let structured cancellation propagate cleanly.
+        raise
     except Exception as e:
         # Hard fail if we can't even parse/validate the LLM outputs.
         extraction_ok = False

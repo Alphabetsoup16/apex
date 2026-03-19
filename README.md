@@ -1,27 +1,38 @@
 # APEX (Adversarial Pipeline for Execution eXamination)
 
-APEX is an MCP server that verifies LLM outputs using:
-1) multi-path generation (ensemble),
-2) an adversarial review pass (structured findings),
-3) optional code execution as ground truth via a sandboxed backend.
+APEX is an MCP server that verifies LLM outputs using a layered approach:
 
-Verdicts:
-- `high_verified`
-- `needs_review`
-- `blocked`
+- Multi-path generation (ensemble voting)
+- An adversarial review pass (structured findings)
+- Optional executable ground truth for code via a sandboxed backend
+
+## Verdicts
+
+- `high_verified`: executable ground truth enabled (code mode) and both suites pass
+- `needs_review`: verification was inconclusive
+- `blocked`: extraction/validation failed, adversarial findings are too severe, or executable checks failed
 
 ## Requirements
 
 - Python `>= 3.10`
+
+## Configuration
+
 - LLM provider (currently Anthropic-only):
   - `APEX_LLM_PROVIDER` (default: `anthropic`)
   - `ANTHROPIC_API_KEY`
   - `ANTHROPIC_MODEL`
   - optional `ANTHROPIC_BASE_URL` (default: `https://api.anthropic.com`)
-- (For code mode) an execution backend endpoint reachable from the APEX process
+- (For code mode) executable backend endpoint reachable from the APEX process:
+  - `APEX_EXECUTION_BACKEND_URL` (optional unless `code_ground_truth=true`)
+- Optional backend authorization:
+  - `APEX_EXECUTION_BACKEND_API_KEY` (enables Bearer auth)
+  - `APEX_EXECUTION_BACKEND_AUTH_HEADER` (optional; default `Authorization`)
+- Optional bounded concurrency:
+  - `APEX_LLM_CONCURRENCY` (default: `2`)
 
 ## Execution latency expectation
-With `APEX_EXECUTION_BACKEND_URL` pointing at a live backend, per-run latency is mostly LLM time plus a single `pytest` job on the backend.
+With `APEX_EXECUTION_BACKEND_URL` pointing at a live backend, per-run latency is mostly LLM time plus backend execution. In code mode with `code_ground_truth=true`, APEX runs two independent pytest suites (`tests_v1` and `tests_v2`).
 
 ## Setup
 
@@ -76,6 +87,7 @@ Create a file at `.cursor/mcp.json`:
       "command": "python3",
       "args": ["-m", "apex", "serve", "--transport", "stdio"],
       "env": {
+        "APEX_LLM_PROVIDER": "anthropic",
         "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}",
         "ANTHROPIC_MODEL": "${env:ANTHROPIC_MODEL}"
       }
@@ -94,6 +106,16 @@ Tool parameters:
 - `code_ground_truth` (default `false`; only affects `mode=code`)
 - `ensemble_runs` (default `3`)
 - `max_tokens` (default `1024`)
+
+### Output fields
+
+The tool returns JSON with:
+
+- `verdict` (`high_verified` | `needs_review` | `blocked`)
+- `output` (string; best candidate output)
+- `metadata` (structured run metadata)
+- `adversarial_review` (structured findings, or `null`)
+- `execution` (execution result for code mode, or `null`)
 
 ## Code-mode execution contract (what the backend must implement)
 
@@ -135,18 +157,24 @@ Your backend should return JSON shaped like:
 }
 ```
 
-## Verdict semantics for code mode
+The required fields above must be present. Optional fields may be included.
 
-- With `code_ground_truth=true`, APEX generates and executes two independent pytest suites, and may return `high_verified` only if the sandboxed execution backend reports `pass=true` for both.
-- With `code_ground_truth=false`, APEX will never return `high_verified` for code; it will return `needs_review` (with `metadata.verification_scale = "spec_only"`).
+## Verdict Semantics for Code Mode
+
+- With `code_ground_truth=true`:
+  - APEX executes two independent pytest suites (`tests_v1` and `tests_v2`)
+  - `high_verified` is only possible if the backend reports `pass=true` for both suites
+- With `code_ground_truth=false`:
+  - APEX will never return `high_verified` for code
+  - it downgrades to `needs_review` with `metadata.verification_scale = "spec_only"`
 
 When APEX calls the backend, it also includes conservative capability flags in `limits`:
 - `allow_network` (default `false`)
 - `allow_filesystem_write` (default `false`)
 - `allow_dependency_install` (default `false`)
 
-## Security notes
+## Security Notes
 
-- Code “ground truth” only works if your execution backend is properly sandboxed (no network by default, least-privilege filesystem, strict CPU/memory/time limits).
-- APEX also redacts common secret patterns from prompts and logs before sending to the LLM/reviewers.
+- Executable ground truth is meaningful only if your backend is properly sandboxed (no network by default, least-privilege filesystem, strict CPU/memory/time limits).
+- APEX also redacts common secret patterns from prompts before sending to the LLM and reviewers.
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -92,7 +93,7 @@ class HttpExecutionBackend:
                 status = e.response.status_code
                 last_err = e
                 if status in (502, 503, 504) and attempt < max_retries:
-                    time.sleep(0.5 * (2**attempt))
+                    await asyncio.sleep(0.5 * (2**attempt))
                     continue
                 raise
 

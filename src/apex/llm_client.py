@@ -78,6 +78,8 @@ class AnthropicMessagesClient:
                     if blk.get("type") == "text" and isinstance(blk.get("text"), str):
                         texts.append(blk["text"])
                 return "".join(texts).strip()
+            except asyncio.CancelledError:
+                raise
             except Exception as e:  # pragma: no cover (network)
                 last_err = e
                 # Small backoff; don't retry for 4xx
@@ -112,6 +114,8 @@ class AnthropicMessagesClient:
                 # We accept wrapper text, but still require the first JSON object.
                 json_str = extract_first_json_object(text)
                 return json.loads(json_str)
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
                 parse_err = e
                 user = (

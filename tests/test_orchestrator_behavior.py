@@ -216,3 +216,146 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(monke
     assert captured["execution_pass"] is True
     assert result.execution is not None
 
+
+def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(orchestrator, "code_convergence", lambda solutions: 0.5)
+    monkeypatch.setattr(orchestrator, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        assert client.model == "fake-code"
+        return [_solution_bundle()]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        assert suite_label in ("tests_v1", "tests_v2")
+        if suite_label == "tests_v1":
+            # Missing `test_solution.py` should trigger `validate_code_bundles` failure.
+            return CodeTests(
+                files=[CodeFile(path="not_test_solution.py", content="x = 1\n")],
+                test_framework="pytest",
+            )
+        # This will be scheduled (because code_ground_truth=True) but should be cancelled.
+        await asyncio.sleep(0.05)
+        return _tests_bundle(2)
+
+    async def fake_review_code(**kwargs):
+        raise AssertionError("review_code should not be called when tests bundle validation fails")
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="auto",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+        )
+    )
+
+    assert result.verdict == "blocked"
+    assert result.adversarial_review is None
+    assert result.execution is None
+    assert result.metadata["mode"] == "code"
+    assert "missing_test_solution_py" in result.metadata.get("error", "")
+
+
+def test_apex_run_code_ground_truth_false_never_high_verified(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [_solution_bundle()]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        assert suite_label == "tests_v1"
+        return _tests_bundle(1)
+
+    async def fake_review_code(
+        *, client, task_prompt: str, candidate, tests_files_by_suite, execution_passes, max_tokens: int
+    ):
+        assert execution_passes is None
+        assert task_prompt.lower().startswith("write code")
+        return AdversarialReview(
+            findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
+        )
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=False,
+        )
+    )
+
+    assert result.verdict == "needs_review"
+    assert result.metadata["ground_truth_enabled"] is False
+    assert result.metadata["verification_scale"] == "spec_only"
+    assert result.metadata["execution_passes"] is None
+    assert result.execution is None
+
+
+def test_apex_run_code_ground_truth_one_suite_fails_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(orchestrator, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [_solution_bundle()]
+
+    async def fake_generate_code_tests(*, client, prompt: str, config, suite_label: str, temperature: float):
+        if suite_label == "tests_v1":
+            return _tests_bundle(1)
+        return _tests_bundle(2)
+
+    async def fake_review_code(
+        *, client, task_prompt: str, candidate, tests_files_by_suite, execution_passes, max_tokens: int
+    ):
+        assert execution_passes == [True, False]
+        return AdversarialReview(
+            findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
+        )
+
+    class _FakeBackend:
+        async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
+            # orchestrator uses: f"{run_id}-suite{suite_idx}"
+            suite_idx = 0 if run_id.endswith("-suite0") else 1
+            pass_val = suite_idx == 0
+            return ExecutionResult(
+                **{"pass": pass_val},
+                stdout=f"suite{suite_idx} stdout",
+                stderr="",
+                duration_ms=1,
+            )
+
+    monkeypatch.setattr(orchestrator, "generate_code_solution_variants", fake_generate_code_solution_variants)
+    monkeypatch.setattr(orchestrator, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(orchestrator, "review_code", fake_review_code)
+    monkeypatch.setattr(orchestrator, "load_execution_backend_from_env", lambda: _FakeBackend())
+
+    result = asyncio.run(
+        orchestrator.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+        )
+    )
+
+    assert result.verdict == "blocked"
+    assert result.metadata["execution_passes"] == [True, False]
+    assert result.execution is not None
+    assert result.execution.pass_ is True
+
