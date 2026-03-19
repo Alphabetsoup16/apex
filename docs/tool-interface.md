@@ -32,6 +32,7 @@ The tool returns JSON shaped like:
 
 ### Metadata notes
 
+- `metadata.pipeline_steps`: ordered traces for steps executed via the standard runner (see [pipeline-steps.md](pipeline-steps.md)); includes at least `cot_audit`.
 - If `known_good_baseline` is provided, `metadata.baseline_similarity` may be included.
 - If chain-of-thought leakage is detected, the run is `blocked` and `metadata.cot_audit` is included.
 

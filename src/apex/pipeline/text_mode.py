@@ -7,6 +7,7 @@ from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.generation.ensemble import EnsembleConfig, generate_text_variants
 from apex.models import ApexRunToolResult, TextCompletion
 from apex.pipeline.helpers import blocked_code_result, sequence_similarity
+from apex.pipeline.step_support import REQUIRED, run_async_step
 from apex.review.adversarial import review_text
 from apex.review.pack import build_pr_review_pack
 from apex.safety.cot_audit import audit_chain_of_thought
@@ -38,12 +39,22 @@ async def run_text_mode(
     candidate = variants[best_i]
     ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
 
-    cot_text = candidate.answer + "\n" + "\n".join(candidate.key_claims)
-    cot_findings = audit_chain_of_thought(cot_text, context="text")
-    if cot_findings:
+    pipeline_steps: list[dict] = []
+
+    async def _cot_audit() -> dict:
+        cot_text = candidate.answer + "\n" + "\n".join(candidate.key_claims)
+        findings = audit_chain_of_thought(cot_text, context="text")
+        if findings:
+            return {"ok": False, "findings": findings}
+        return {"ok": True}
+
+    cot_trace = await run_async_step("cot_audit", REQUIRED, _cot_audit)
+    pipeline_steps.append(cot_trace.as_dict())
+    if not cot_trace.ok:
+        findings = cot_trace.detail.get("findings") or []
         return blocked_code_result(
             output="APEX blocked: chain-of-thought leakage detected",
-            error="cot_findings=" + ",".join(cot_findings),
+            error="cot_findings=" + ",".join(str(x) for x in findings),
             actual_mode=actual_mode,
             ensemble_runs=ensemble_runs,
             code_ground_truth=False,
@@ -56,7 +67,10 @@ async def run_text_mode(
                 "execution": None,
                 "total": int((time.perf_counter() - t_total_start) * 1000),
             },
-            extra_metadata={"cot_audit": {"detected": True, "findings": cot_findings}},
+            extra_metadata={
+                "cot_audit": {"detected": True, "findings": findings},
+                "pipeline_steps": pipeline_steps,
+            },
         )
 
     t_adv_start = time.perf_counter()
@@ -115,6 +129,7 @@ async def run_text_mode(
             "llm_model": client.model,
             "baseline_similarity": baseline_similarity,
             "output_mode": output_mode,
+            "pipeline_steps": pipeline_steps,
             "timings_ms": {
                 "ensemble": ensemble_ms,
                 "adversarial": adversarial_ms,

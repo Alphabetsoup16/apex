@@ -8,7 +8,7 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 |------|-----------|----------------|
 | MCP entry | `apex.mcp.server` | FastMCP tool wiring (`create_mcp_server`) |
 | CLI | `apex.__main__` | `apex serve` |
-| Pipeline | `apex.pipeline.*` | `apex_run` router, text/code mode flows, shared helpers |
+| Pipeline | `apex.pipeline.*` | `apex_run` router, text/code flows, `step_support` + `steps_catalog` |
 | Models | `apex.models` | Pydantic schemas (tool I/O, findings, code bundles) |
 | Config | `apex.config.*` | Thresholds (`constants`), conventions merge (`conventions`), findings policy (`policy`) |
 | Generation | `apex.generation.*` | Ensemble prompts + variant generation |
@@ -28,6 +28,14 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 - **Pipeline** stays orchestration-only; **generation** / **review** / **scoring** are independently testable.
 - **Config** is grouped so env/file policy does not sprawl across the tree.
 - **MCP** is isolated from core logic so the server surface is one import.
+
+## Pipeline steps
+
+- **Catalog**: `apex.pipeline.steps_catalog` — human-readable `PipelineStepSpec` rows per mode (`required` vs `optional`).
+- **Runner**: `apex.pipeline.step_support.run_async_step` — standard timing, `ok` convention, optional-step exception swallowing.
+- **Guide**: [pipeline-steps.md](pipeline-steps.md).
+
+Successful runs attach `metadata.pipeline_steps` with trace objects for steps that use the runner (today: `cot_audit`; extend the same way).
 
 ## Tests
 

@@ -57,6 +57,7 @@ def blocked_code_result(
     timings_ms: dict[str, int | None],
     extra_metadata: dict[str, Any] | None = None,
 ) -> ApexRunToolResult:
+    """Build a blocked verdict for text or code mode (name is historical)."""
     return ApexRunToolResult(
         verdict="blocked",
         output=output,

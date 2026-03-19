@@ -30,6 +30,7 @@ from apex.pipeline.helpers import (
     sequence_similarity,
     validate_code_bundles,
 )
+from apex.pipeline.step_support import REQUIRED, run_async_step
 from apex.review.adversarial import review_code
 from apex.review.inspection import inspect_code_doc_only
 from apex.review.pack import build_pr_review_pack
@@ -57,8 +58,8 @@ async def run_code_mode(
     findings_policy = load_findings_policy()
     extraction_ok = True
     execution: ExecutionResult | None = None
-    adversarial = None
     convergence = 0.0
+    pipeline_steps: list[dict] = []
 
     t_ensemble_start = time.perf_counter()
     solutions: list[CodeSolution] = await generate_code_solution_variants(
@@ -69,12 +70,20 @@ async def run_code_mode(
     solution = solutions[best_i]
     ensemble_ms = int((time.perf_counter() - t_ensemble_start) * 1000)
 
-    cot_code_text = format_solution(solution)
-    cot_findings = audit_chain_of_thought(cot_code_text, context="code")
-    if cot_findings:
+    async def _cot_audit() -> dict:
+        cot_code_text = format_solution(solution)
+        findings = audit_chain_of_thought(cot_code_text, context="code")
+        if findings:
+            return {"ok": False, "findings": findings}
+        return {"ok": True}
+
+    cot_trace = await run_async_step("cot_audit", REQUIRED, _cot_audit)
+    pipeline_steps.append(cot_trace.as_dict())
+    if not cot_trace.ok:
+        findings = cot_trace.detail.get("findings") or []
         return blocked_code_result(
             output="APEX blocked: chain-of-thought leakage detected",
-            error="cot_findings=" + ",".join(cot_findings),
+            error="cot_findings=" + ",".join(str(x) for x in findings),
             actual_mode=actual_mode,
             ensemble_runs=ensemble_runs,
             code_ground_truth=code_ground_truth,
@@ -87,7 +96,10 @@ async def run_code_mode(
                 "execution": None,
                 "total": int((time.perf_counter() - t_total_start) * 1000),
             },
-            extra_metadata={"cot_audit": {"detected": True, "findings": cot_findings}},
+            extra_metadata={
+                "cot_audit": {"detected": True, "findings": findings},
+                "pipeline_steps": pipeline_steps,
+            },
         )
 
     tests_v2_task = None
@@ -137,6 +149,7 @@ async def run_code_mode(
                 "execution": None,
                 "total": int((time.perf_counter() - t_total_start) * 1000),
             },
+            extra_metadata={"pipeline_steps": pipeline_steps},
         )
 
     tests_files_by_suite = [[{"path": f.path, "content": f.content} for f in tests_v1.files]]
@@ -172,6 +185,7 @@ async def run_code_mode(
                     "execution": None,
                     "total": int((time.perf_counter() - t_total_start) * 1000),
                 },
+                extra_metadata={"pipeline_steps": pipeline_steps},
             )
 
         tests_files_by_suite.append(
@@ -346,5 +360,6 @@ async def run_code_mode(
             "execution_ms_per_suite": execution_ms_per_suite,
             "inspection_review": inspection.model_dump(),
             "language": language,
+            "pipeline_steps": pipeline_steps,
         },
     )
