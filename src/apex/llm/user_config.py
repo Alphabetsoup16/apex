@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import stat
@@ -48,33 +49,25 @@ def save_user_llm_config(data: dict[str, Any]) -> Path:
     parent_existed = parent.exists()
     parent.mkdir(parents=True, exist_ok=True)
     if not parent_existed and os.name == "posix":
-        try:
+        with contextlib.suppress(OSError):
             parent.chmod(0o700)
-        except OSError:
-            pass
 
     payload = {"version": CONFIG_VERSION, **data}
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
         tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         if os.name == "posix":
-            try:
+            with contextlib.suppress(OSError):
                 tmp.chmod(stat.S_IRUSR | stat.S_IWUSR)
-            except OSError:
-                pass
         tmp.replace(path)
     except OSError:
-        try:
+        with contextlib.suppress(OSError):
             tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
         raise
 
     if os.name == "posix":
-        try:
+        with contextlib.suppress(OSError):
             path.chmod(stat.S_IRUSR | stat.S_IWUSR)
-        except OSError:
-            pass
     return path
 
 

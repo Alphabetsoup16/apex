@@ -39,13 +39,9 @@ def load_llm_client_from_env() -> LLMClient:
             base_url = DEFAULT_ANTHROPIC_BASE_URL
 
         if not api_key:
-            raise RuntimeError(
-                "Missing Anthropic API key. Set ANTHROPIC_API_KEY or run: apex init"
-            )
+            raise RuntimeError("Missing Anthropic API key. Set ANTHROPIC_API_KEY or run: apex init")
         if not model:
-            raise RuntimeError(
-                "Missing Anthropic model. Set ANTHROPIC_MODEL or run: apex init"
-            )
+            raise RuntimeError("Missing Anthropic model. Set ANTHROPIC_MODEL or run: apex init")
         return AnthropicMessagesClient(
             AnthropicConfig(api_key=api_key, model=model, base_url=base_url)
         )

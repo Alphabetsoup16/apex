@@ -27,7 +27,7 @@ Exact numeric gates live in `apex.config.constants` (e.g. `HIGH_VERIFIED_CONVERG
   - Extraction/validation failures, CoT audit blocks, **high** severity (adversarial or merged inspection), or failed execution when a failing pass is definitive.
   - **Top-level `apex_run` failures** (e.g. missing LLM configuration) return `blocked` with structured metadata (`error`, `error_type`, `pipeline_steps: []`) instead of raising through the MCP tool.
 
-Returned results (including **`blocked`**) still receive **`metadata.telemetry`** and **`metadata.uncertainty`** from **`finalize_run_result`**, so you always get **`trace_validation`** for `pipeline_steps` and routing signals from **`uncertainty`**. See [tool-interface.md](tool-interface.md) and [pipeline-steps.md](pipeline-steps.md).
+Returned results (including **`blocked`**) still receive **`metadata.telemetry`** and **`metadata.uncertainty`** from **`finalize_run_result`**, so you always get **`trace_validation`** for `pipeline_steps` and routing signals from **`uncertainty`**. The same exit path may also append to the **SQLite run ledger** (default **`~/.apex/ledger.sqlite3`**) unless **`APEX_LEDGER_DISABLED=1`**. See [tool-interface.md](tool-interface.md), [pipeline-steps.md](pipeline-steps.md), and [configuration.md](configuration.md#run-ledger-sqlite).
 
 ## `known_good_baseline` downgrade
 

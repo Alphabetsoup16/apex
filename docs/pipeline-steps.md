@@ -88,6 +88,7 @@ Every `apex_run` exit path that returns an `ApexRunToolResult` goes through **`f
 
 1. Runs **`validate_pipeline_steps`** on `metadata.pipeline_steps`.
 2. Attaches **`metadata.telemetry`** and **`metadata.uncertainty`**.
+3. Then **`record_apex_run_to_ledger_if_enabled`** (`apex.ledger`) may append a row to a local **SQLite** database (default **`~/.apex/ledger.sqlite3`**; disable with **`APEX_LEDGER_DISABLED=1`**). The ledger stores verdict, trace-validation summary, step timing/shape, and optionally step `detail` — see [configuration.md](configuration.md#run-ledger-sqlite). CLI: **`apex ledger summary`**.
 
 ### `metadata.telemetry` (`apex.telemetry/v1`)
 

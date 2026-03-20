@@ -33,3 +33,7 @@ Optional **findings policy** may filter **low** findings for display; it **canno
 
 This stage is designed to be extensible later (e.g., doc retrieval or static analyzers per language).
 
+## Run ledger (local persistence)
+
+By default, APEX appends a **SQLite** row per `apex_run` under **`~/.apex/ledger.sqlite3`** (verdict, trace-validation status, step timing/shape; optional step `detail` if enabled). That file is **not** the same as redacted LLM traffic — treat it like operational telemetry on disk. Disable with **`APEX_LEDGER_DISABLED=1`** or limit detail with **`APEX_LEDGER_STORE_STEP_DETAIL=0`** (default). See [configuration.md](configuration.md#run-ledger-sqlite).
+

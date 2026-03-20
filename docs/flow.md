@@ -15,8 +15,8 @@ flowchart TD
   T8 --> T5{known_good_baseline?}
   T5 -->|yes| T6["Baseline similarity; may downgrade high_verified → needs_review"]
   T5 -->|no| T7["Skip (traced as optional step)"]
-  T6 --> OUT["Return verdict, output, metadata (pipeline_steps, telemetry, uncertainty)"]
-  T7 --> OUT
+  T6 --> OUTA["Assemble tool result (verdict, output, metadata.pipeline_steps)"]
+  T7 --> OUTA
 
   C -->|code| C1["Generate N code variants (ensemble)"]
   C1 --> C2["Convergence scoring and select best"]
@@ -38,8 +38,12 @@ flowchart TD
   C14 --> C15{known_good_baseline?}
   C15 -->|yes| C16["Baseline similarity; may downgrade high_verified → needs_review"]
   C15 -->|no| C17["Skip (traced as optional step)"]
-  C16 --> OUT
-  C17 --> OUT
+  C16 --> OUTA
+  C17 --> OUTA
+
+  OUTA --> FIN["finalize_run_result: validate pipeline_steps + telemetry + uncertainty"]
+  FIN --> LED["SQLite run ledger append (default ~/.apex/ledger.sqlite3; opt-out APEX_LEDGER_DISABLED)"]
+  LED --> RET["Return apex.run JSON to client"]
 ```
 
-Chart matches current `text_mode` / `code_mode`. **`ensemble_runs`** is clamped to 2–3 (see `apex.config.constants`). With `code_ground_truth` off, execution stages are **skipped** but still appear as explicit rows in `metadata.pipeline_steps`. Every returned tool result also gets **`metadata.telemetry`** and **`metadata.uncertainty`** (see [pipeline-steps.md](pipeline-steps.md#observability-automatic)).
+Chart matches current `text_mode` / `code_mode`. **`ensemble_runs`** is clamped to 2–3 (see `apex.config.constants`). With `code_ground_truth` off, execution stages are **skipped** but still appear as explicit rows in `metadata.pipeline_steps`. After the mode pipeline, every result goes through **`finalize_run_result`** (**`metadata.telemetry`** + **`metadata.uncertainty`**), then a **SQLite ledger** append (**on by default** at **`~/.apex/ledger.sqlite3`**; opt-out **`APEX_LEDGER_DISABLED=1`** — see [pipeline-steps.md](pipeline-steps.md#observability-automatic) and [configuration.md](configuration.md#run-ledger-sqlite)). Inspect locally with **`apex ledger summary`**.

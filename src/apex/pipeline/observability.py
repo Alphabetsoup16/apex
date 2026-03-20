@@ -35,7 +35,9 @@ def _inspection_findings_from_metadata(metadata: dict[str, Any]) -> list[dict[st
     return raw if isinstance(raw, list) else []
 
 
-def _max_severity_from_raw_findings(rows: list[dict[str, Any]]) -> Literal["none", "low", "medium", "high"]:
+def _max_severity_from_raw_findings(
+    rows: list[dict[str, Any]],
+) -> Literal["none", "low", "medium", "high"]:
     best = "none"
     for r in rows:
         if not isinstance(r, dict):
@@ -96,7 +98,7 @@ def build_telemetry_v1(
         if isinstance(t, bool):
             wall = None
         elif isinstance(t, (int, float)):
-            wall = int(round(t))
+            wall = round(t)
 
     steps_raw = metadata.get("pipeline_steps") or []
     spans: list[dict[str, Any]] = []

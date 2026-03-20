@@ -28,3 +28,15 @@ def test_cli_init_default_dispatches_to_cmd_setup(monkeypatch) -> None:
 
     apex_main.main(["init"])
     assert called == ["setup"]
+
+
+def test_cli_ledger_summary_dispatches(monkeypatch) -> None:
+    from apex.cli import ledger_cmd
+
+    called: list[str] = []
+
+    monkeypatch.setattr(ledger_cmd, "cmd_ledger_summary", lambda: called.append("summary"))
+
+    apex_main.main(["ledger"])
+    apex_main.main(["ledger", "summary"])
+    assert called == ["summary", "summary"]

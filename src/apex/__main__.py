@@ -18,6 +18,19 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_local_setup_parser(sub, "init")
     _add_local_setup_parser(sub, "setup")
 
+    ledger_p = sub.add_parser(
+        "ledger",
+        help="Inspect local run ledger (SQLite audit trail)",
+    )
+    ledger_p.add_argument(
+        "action",
+        nargs="?",
+        default="summary",
+        choices=["summary"],
+        metavar="ACTION",
+        help="summary: counts, verdict breakdown, recent runs (default).",
+    )
+
     return parser
 
 
@@ -52,6 +65,11 @@ def main(argv: list[str] | None = None) -> None:
             llm_cmd.cmd_clear()
         else:
             llm_cmd.cmd_setup()
+    elif args.cmd == "ledger":
+        from apex.cli import ledger_cmd
+
+        if args.action == "summary":
+            ledger_cmd.cmd_ledger_summary()
 
 
 if __name__ == "__main__":

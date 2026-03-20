@@ -45,3 +45,7 @@ The tool returns JSON shaped like:
 - If `known_good_baseline` is provided, `metadata.baseline_similarity` may be included.
 - If chain-of-thought leakage is detected, the run is `blocked` and `metadata.cot_audit` is included.
 
+### Side effects (not in the JSON body)
+
+- **Run ledger**: by default, each completed `apex_run` appends an audit row to **`~/.apex/ledger.sqlite3`** (SQLite). This does not change the tool response shape; turn off with **`APEX_LEDGER_DISABLED=1`** or override **`APEX_LEDGER_PATH`**. See [configuration.md](configuration.md#run-ledger-sqlite); inspect with **`apex ledger summary`**.
+

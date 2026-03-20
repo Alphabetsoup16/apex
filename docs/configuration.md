@@ -77,6 +77,22 @@ On POSIX the config file is chmod **`600`** when possible, and the short-lived `
 
 This bounds concurrent ensemble generation and helps keep latency predictable.
 
+## Run ledger (SQLite)
+
+APEX persists a lightweight **SQLite** audit trail of each `apex_run` response (verdict, trace validation, step timing/shape, optional step `detail`). The file is a normal SQLite database (WAL mode); it is created on first recorded run.
+
+**Default:** `~/.apex/ledger.sqlite3` (ledger **on** unless you opt out).
+
+- `APEX_LEDGER_DISABLED` — set to `1` / `true` / `yes` to turn the ledger off entirely (no writes, `apex ledger` reports disabled).
+- `APEX_LEDGER_PATH` — override the SQLite file path (still disabled if `APEX_LEDGER_DISABLED` is truthy).
+- `APEX_LEDGER_STORE_STEP_DETAIL` — `0` (default) or `1`.
+  - When `0`, the ledger stores step trace shape and timing, but does not persist `pipeline_steps[*].detail` (step payloads can be large and may include sensitive evidence).
+  - When `1`, it stores `detail_json` with truncation.
+- `APEX_LEDGER_MAX_DETAIL_CHARS` — default `65536`; truncates stored step `detail` to cap DB growth.
+- `APEX_LEDGER_BUSY_TIMEOUT_MS` — default `2000`; SQLite busy timeout when concurrent writes happen.
+
+**CLI:** `apex ledger` or `apex ledger summary` prints counts, verdict breakdown, trace-validation failures, and recent runs.
+
 ## Conventions (optional)
 
 - Repo-local: `.apex/conventions.md` (or `.apex/conventions.txt`)

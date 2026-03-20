@@ -8,6 +8,7 @@ from typing import Literal
 from apex.config.constants import ENSEMBLE_RUNS_MAX_EFFECTIVE, ENSEMBLE_RUNS_MIN_EFFECTIVE
 from apex.config.conventions import load_effective_conventions
 from apex.generation.ensemble import EnsembleConfig
+from apex.ledger import record_apex_run_to_ledger_if_enabled
 from apex.llm.loader import load_llm_client_from_env
 from apex.models import ApexRunToolResult, Mode
 from apex.pipeline.code_mode import run_code_mode
@@ -102,7 +103,9 @@ async def apex_run(
             ensemble_runs_requested=ensemble_runs_requested,
             ensemble_runs_effective=ensemble_runs,
         )
-        return finalize_run_result(result, run_id=run_id, mode=actual_mode)
+        finalized = finalize_run_result(result, run_id=run_id, mode=actual_mode)
+        await record_apex_run_to_ledger_if_enabled(finalized)
+        return finalized
     except asyncio.CancelledError:
         raise
     except Exception as e:
@@ -129,4 +132,6 @@ async def apex_run(
                 "pipeline_steps": [],
             },
         )
-        return finalize_run_result(failed, run_id=run_id, mode=actual_mode)
+        finalized = finalize_run_result(failed, run_id=run_id, mode=actual_mode)
+        await record_apex_run_to_ledger_if_enabled(finalized)
+        return finalized

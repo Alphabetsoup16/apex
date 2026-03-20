@@ -41,6 +41,8 @@ export ANTHROPIC_MODEL="claude-3-5-haiku-latest"
 
 See [Configuration](docs/configuration.md) for `~/.apex/config.json`, overrides, and why GitHub Copilot is not a direct option.
 
+Run history (optional audit trail): default SQLite ledger at `~/.apex/ledger.sqlite3`; inspect with `apex ledger summary` (disable with `APEX_LEDGER_DISABLED=1`). Details in [Configuration - Run ledger](docs/configuration.md#run-ledger-sqlite).
+
 Optional: enable executable verification for code mode:
 
 ```bash
@@ -66,7 +68,7 @@ APEX exposes `apex.run` with:
 
 See:
 - [Architecture](docs/architecture.md)
-- [Flow chart](docs/flow.md)
+- [Flow chart](docs/flow.md) (includes finalize + ledger before return)
 - [Pipeline steps (extending verification)](docs/pipeline-steps.md)
 - [Tool interface contract](docs/tool-interface.md)
 - [Verification semantics](docs/verification.md)
