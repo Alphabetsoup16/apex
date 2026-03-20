@@ -31,6 +31,10 @@ def create_mcp_server() -> FastMCP:
         For code: generates a Python solution + pytest tests. If `code_ground_truth=true`,
         it executes tests via `APEX_EXECUTION_BACKEND_URL`, then returns a deterministic verdict.
         Also performs chain-of-thought auditing on generated solution content.
+
+        `mode="auto"` uses a small keyword heuristic and may misclassify; pass `mode` explicitly
+        when behavior must be predictable. `ensemble_runs` is clamped to 2–3; see response
+        metadata `ensemble_runs_requested` vs `ensemble_runs_effective`.
         """
 
         result = await apex_run(

@@ -109,8 +109,11 @@ CODE_PIPELINE_STEPS: tuple[PipelineStepSpec, ...] = (
         id="findings_policy",
         requirement=OPTIONAL,
         modes=("code",),
-        summary="Optional filter on finding types/severities (global + repo policy files).",
-        verdict_impact="Reporting only; does not weaken safety blocks.",
+        summary=(
+            "Optional filter on **low** findings by type/severity (global + repo policy files); "
+            "high/medium are always retained."
+        ),
+        verdict_impact="Cannot remove high/medium; does not weaken safety blocks.",
     ),
     PipelineStepSpec(
         id="baseline_alignment",

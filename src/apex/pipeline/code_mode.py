@@ -17,6 +17,7 @@ from apex.generation.ensemble import (
     generate_code_solution_variants,
     generate_code_tests,
 )
+from apex.llm.interface import LLMClient
 from apex.models import (
     AdversarialReview,
     ApexRunToolResult,
@@ -46,7 +47,7 @@ from apex.scoring import DecisionSignals, code_convergence, decide_verdict, sele
 
 async def run_code_mode(
     *,
-    client,
+    client: LLMClient,
     prompt: str,
     cfg: EnsembleConfig,
     ensemble_runs: int,

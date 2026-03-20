@@ -4,7 +4,12 @@ import ast
 import difflib
 from dataclasses import dataclass
 
-from apex.models import CodeSolution, TextCompletion
+from apex.config.constants import (
+    HIGH_VERIFIED_CONVERGENCE_THRESHOLD,
+    TEXT_ANSWER_CONVERGENCE_WEIGHT,
+    TEXT_CLAIMS_CONVERGENCE_WEIGHT,
+)
+from apex.models import CodeSolution, TextCompletion, Verdict
 
 
 def _normalize_ws(s: str) -> str:
@@ -61,7 +66,10 @@ def text_convergence(variants: list[TextCompletion]) -> float:
         for j in range(i + 1, len(answers)):
             answer_sim = difflib.SequenceMatcher(a=answers[i], b=answers[j]).ratio()
             claims_sim = _pairwise_average_similarity(key_claims[i], key_claims[j])
-            pairs.append(0.7 * answer_sim + 0.3 * claims_sim)
+            pairs.append(
+                TEXT_ANSWER_CONVERGENCE_WEIGHT * answer_sim
+                + TEXT_CLAIMS_CONVERGENCE_WEIGHT * claims_sim
+            )
     return sum(pairs) / max(1, len(pairs))
 
 
@@ -142,7 +150,10 @@ def select_best_text(variants: list[TextCompletion]) -> int:
                 continue
             answer_sim = difflib.SequenceMatcher(a=answers[i], b=answers[j]).ratio()
             claims_sim = _pairwise_average_similarity(claims[i], claims[j])
-            scores.append(0.7 * answer_sim + 0.3 * claims_sim)
+            scores.append(
+                TEXT_ANSWER_CONVERGENCE_WEIGHT * answer_sim
+                + TEXT_CLAIMS_CONVERGENCE_WEIGHT * claims_sim
+            )
         avg = sum(scores) / max(1, len(scores))
         if avg > best_score:
             best_score = avg
@@ -179,7 +190,7 @@ class DecisionSignals:
     extraction_ok: bool
 
 
-def decide_verdict(signals: DecisionSignals) -> str:
+def decide_verdict(signals: DecisionSignals) -> Verdict:
     if not signals.extraction_ok:
         return "blocked"
     if signals.adversarial_high:
@@ -190,12 +201,15 @@ def decide_verdict(signals: DecisionSignals) -> str:
     if signals.execution_required:
         if (
             signals.execution_pass is True
-            and signals.convergence >= 0.98
+            and signals.convergence >= HIGH_VERIFIED_CONVERGENCE_THRESHOLD
             and not signals.adversarial_medium
         ):
             return "high_verified"
     else:
-        if signals.convergence >= 0.98 and not signals.adversarial_medium:
+        if (
+            signals.convergence >= HIGH_VERIFIED_CONVERGENCE_THRESHOLD
+            and not signals.adversarial_medium
+        ):
             return "high_verified"
 
     return "needs_review"

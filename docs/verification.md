@@ -6,24 +6,26 @@ APEX is optimized for **high-leverage, low-latency** verification while you are 
 
 **Medium/heavy assurance**—running the full repo test suite, production-like integration tests, builds, CodeQL, SonarQube, Snyk, etc.—is expected to run in your **existing CI** when code is pushed. APEX complements that by making the *human* review step sharper; it is not a substitute for org-wide CI gates.
 
-APEX produces a result by combining three signals:
+APEX produces a result by combining:
 
 1. Ensemble generation (multi-path convergence)
-2. Adversarial review pass (structured findings)
-3. Optional executable ground truth for code
+2. Structured adversarial review (and in code mode, doc-only **inspection** in parallel)
+3. Optional executable ground truth for code (`code_ground_truth=true` + backend)
+
+Exact numeric gates live in `apex.config.constants` (e.g. `HIGH_VERIFIED_CONVERGENCE_THRESHOLD`).
 
 ## Verdicts
 
 - `high_verified`
-  - Text mode: only returned when the ensemble is strongly convergent and no medium adversarial findings exist.
-  - Code mode: only returned when execution ground truth is enabled and both independent test suites pass.
+  - **Text mode:** ensemble convergence ≥ `HIGH_VERIFIED_CONVERGENCE_THRESHOLD`, no **high** adversarial findings, no **medium** adversarial findings, extraction OK (`execution_required=false` in scoring).
+  - **Code mode:** `execution_required` is always **true** in scoring, so `high_verified` requires **execution_pass is true** (both suites passed on the backend) **and** the same convergence + adversarial gates as above. With `code_ground_truth=false`, execution is not run (`execution_pass` stays unknown), so **`high_verified` is not returned** — typical outcome is `needs_review` unless blocked.
+  - **Inspection (code):** only **high** inspection findings are merged into the same “high severity” signal as adversarial highs; inspection medium/low do not feed `DecisionSignals` today.
 - `needs_review`
-  - Returned when signals indicate the output is plausible but not sufficiently verified (e.g., execution not enabled).
-  - Also used when `known_good_baseline` indicates the candidate diverges enough from the baseline.
+  - Default when signals are inconclusive (e.g. execution required but passes unknown, or convergence/adversarial short of `high_verified`).
+  - Also used when `known_good_baseline` triggers a downgrade from `high_verified` (similarity below `BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD`).
 - `blocked`
-  - Returned when extraction/validation fails.
-  - Returned when safety/auditing (including chain-of-thought auditing) blocks the run.
-  - Returned when adversarial findings are too severe.
+  - Extraction/validation failures, CoT audit blocks, **high** severity (adversarial or merged inspection), or failed execution when a failing pass is definitive.
+  - **Top-level `apex_run` failures** (e.g. missing LLM configuration) return `blocked` with structured metadata (`error`, `error_type`, `pipeline_steps: []`) instead of raising through the MCP tool.
 
 ## `known_good_baseline` downgrade
 
@@ -36,7 +38,10 @@ APEX downgrades to `needs_review`.
 
 ## Inspection stage policy (code mode)
 
-If an optional inspection pass reports findings:
-- `high` findings can affect the final verdict
-- `medium`/`low` findings are reported, but do not by themselves downgrade/grade the verdict
+After parallel LLM calls, **findings policy** may hide **low**-severity noise; **`high` and `medium` are never dropped** (see [configuration.md](configuration.md)).
+
+For **verdict** computation:
+
+- **High** inspection findings are combined with adversarial highs (either can drive `blocked`).
+- **Medium / low** from inspection are for reporting only; **medium from the adversarial reviewer** still prevents `high_verified` (see `decide_verdict`).
 

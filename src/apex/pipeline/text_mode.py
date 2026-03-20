@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
 from apex.generation.ensemble import EnsembleConfig, generate_text_variants
+from apex.llm.interface import LLMClient
 from apex.models import ApexRunToolResult, TextCompletion
 from apex.pipeline.helpers import blocked_run_result, sequence_similarity
 from apex.pipeline.step_support import OPTIONAL, REQUIRED, run_async_step, skipped_step_record
@@ -16,7 +17,7 @@ from apex.scoring import DecisionSignals, decide_verdict, select_best_text, text
 
 async def run_text_mode(
     *,
-    client,
+    client: LLMClient,
     prompt: str,
     cfg: EnsembleConfig,
     ensemble_runs: int,

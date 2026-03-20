@@ -34,4 +34,23 @@ def test_findings_policy_filters_by_type_and_severity() -> None:
     p = FindingsPolicy(ignored_types=("style",), ignored_severities=("low",))
     out = p.apply(review)
 
-    assert [f.evidence for f in out.findings] == ["A"]
+    # Medium is verdict-relevant and must not be removed even when type is ignored.
+    assert [f.evidence for f in out.findings] == ["A", "B"]
+
+
+def test_findings_policy_never_drops_high_even_when_type_or_severity_ignored() -> None:
+    review = AdversarialReview(
+        findings=[
+            Finding(
+                severity="high",
+                type="style",
+                confidence=0.9,
+                evidence="must_stay",
+                recommendation="x",
+            ),
+        ]
+    )
+    p = FindingsPolicy(ignored_types=("style",), ignored_severities=("high",))
+    out = p.apply(review)
+    assert len(out.findings) == 1
+    assert out.findings[0].evidence == "must_stay"

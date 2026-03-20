@@ -49,13 +49,14 @@ python3 -m apex serve --transport stdio
 
 APEX exposes `apex.run` with:
 - `prompt` (string)
-- `mode` (`auto` | `text` | `code`)
+- `mode` (`auto` | `text` | `code`) — `auto` uses a small keyword heuristic; prefer an explicit mode when classification must be reliable
 - `code_ground_truth` (enables execution verification in `mode=code`)
-- `ensemble_runs`, `max_tokens`
+- `ensemble_runs` (clamped server-side to **2–3**), `max_tokens`
 - `known_good_baseline` (optional similarity downgrade for `high_verified`)
 
 See:
 - [Architecture](docs/architecture.md)
+- [Flow chart](docs/flow.md)
 - [Pipeline steps (extending verification)](docs/pipeline-steps.md)
 - [Tool interface contract](docs/tool-interface.md)
 - [Verification semantics](docs/verification.md)
@@ -79,4 +80,6 @@ make check
 ```
 
 `Makefile` uses `python -m ruff` when available; otherwise it looks for `vendor/bin/ruff` (local vendoring — not in git).
+
+Regression-style checks for verdict + `pipeline_steps` order live under `tests/eval/` (deterministic mocks, no live LLM).
 

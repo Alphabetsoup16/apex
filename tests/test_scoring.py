@@ -1,3 +1,4 @@
+from apex.config.constants import HIGH_VERIFIED_CONVERGENCE_THRESHOLD
 from apex.models import CodeFile, CodeSolution, TextCompletion
 from apex.scoring import DecisionSignals, code_signature, decide_verdict, text_convergence
 
@@ -41,3 +42,20 @@ def test_decide_verdict_code_no_execution_downgrades():
         extraction_ok=True,
     )
     assert decide_verdict(signals) == "needs_review"
+
+
+def test_decide_verdict_respects_high_verified_convergence_threshold():
+    base = dict(
+        adversarial_high=False,
+        adversarial_medium=False,
+        execution_pass=None,
+        execution_required=False,
+        extraction_ok=True,
+    )
+    below = DecisionSignals(
+        convergence=max(0.0, HIGH_VERIFIED_CONVERGENCE_THRESHOLD - 0.01),
+        **base,
+    )
+    assert decide_verdict(below) == "needs_review"
+    at = DecisionSignals(convergence=HIGH_VERIFIED_CONVERGENCE_THRESHOLD, **base)
+    assert decide_verdict(at) == "high_verified"

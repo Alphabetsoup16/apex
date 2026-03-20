@@ -40,4 +40,9 @@ Successful runs attach `metadata.pipeline_steps` with trace objects for each log
 
 ## Tests
 
-Behavioral tests patch the module where a name is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a different import path for the same symbol.
+- **Unit / integration (mocked LLM):** patch the module where a name is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a different import path for the same symbol.
+- **Eval / regressions:** `tests/eval/` — parametrized cases asserting `verdict` and `metadata.pipeline_steps` order under deterministic fakes.
+
+## Related docs
+
+- [flow.md](flow.md) — high-level Mermaid chart (authoritative detail: `pipeline_steps` + [pipeline-steps.md](pipeline-steps.md)).

@@ -58,3 +58,11 @@ Runtime listing (for docs/tests): `apex.pipeline.steps_catalog.catalog_summary()
 ## Ordering
 
 Order is defined by the control flow in `text_mode` / `code_mode`, not by the catalog. The catalog documents intent; the code is authoritative.
+
+## Regression checks
+
+Add or extend cases under `tests/eval/` when you change step order or verdict behavior, so CI catches orchestration drift without a live LLM.
+
+## High-level diagram
+
+See [flow.md](flow.md) for a Mermaid overview (use `metadata.pipeline_steps` for exact runtime order).

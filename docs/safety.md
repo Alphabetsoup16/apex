@@ -22,11 +22,14 @@ Note: CoT auditing is heuristic and intentionally errs on the side of blocking.
 
 ## Doc-only inspection (code mode)
 
-In `mode=code`, APEX also runs an additional “inspection” pass that relies on LLM knowledge (no external doc retrieval yet).
+In `mode=code`, APEX runs an **inspection** pass in parallel with adversarial code review (LLM-only today; no external doc retrieval).
 
-Policy:
-- Findings with `severity="high"` can affect the verdict (may block or downgrade outcomes)
-- Findings with `severity="medium"` or `severity="low"` are included for reporting, but do not affect the verdict yet
+**Verdict wiring (today):**
 
-This stage is designed to be extensible later (e.g., swap in doc retrieval via Context7 or static analyzers per language).
+- **Adversarial review:** `high` → can `block`; `medium` → blocks `high_verified` (still `needs_review` if not blocked); `low` → report.
+- **Inspection:** only **`high`** is OR’d into the same severity signal as adversarial `high` (so inspection can block). Inspection **`medium` / `low`** do not change `DecisionSignals`; they appear in the inspection payload / review pack only.
+
+Optional **findings policy** may filter **low** findings for display; it **cannot** remove `high` or `medium` (see [configuration.md](configuration.md)).
+
+This stage is designed to be extensible later (e.g., doc retrieval or static analyzers per language).
 

@@ -825,3 +825,62 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
     assert result.verdict == "needs_review"
     assert result.metadata["baseline_similarity"] is not None
     assert result.execution is not None
+
+
+def test_apex_run_top_level_exception_has_rich_metadata(monkeypatch: pytest.MonkeyPatch):
+    long_msg = "e" * 2500
+
+    def boom() -> None:
+        raise RuntimeError(long_msg)
+
+    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", boom)
+
+    result = asyncio.run(
+        pipeline_run.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=5,
+            max_tokens=512,
+            code_ground_truth=False,
+        )
+    )
+    assert isinstance(result, ApexRunToolResult)
+    assert result.verdict == "blocked"
+    md = result.metadata
+    assert md["ensemble_runs_requested"] == 5
+    assert md["ensemble_runs_effective"] == 3
+    assert md["mode_request"] == "text"
+    assert md["mode_inferred"] is None
+    assert md["mode"] == "text"
+    assert md["error_type"] == "RuntimeError"
+    assert md["error"] == long_msg
+    assert md["pipeline_steps"] == []
+    assert "total" in md["timings_ms"]
+
+
+def test_apex_run_success_includes_ensemble_request_metadata(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+
+    async def fake_generate_text_variants(*, client, prompt: str, config):
+        return [TextCompletion(answer="ok", key_claims=["x"])]
+
+    async def fake_review_text(**kwargs):
+        return AdversarialReview(findings=[])
+
+    monkeypatch.setattr(text_mode, "generate_text_variants", fake_generate_text_variants)
+    monkeypatch.setattr(text_mode, "review_text", fake_review_text)
+    monkeypatch.setattr(text_mode, "text_convergence", lambda variants: 0.99)
+    monkeypatch.setattr(text_mode, "select_best_text", lambda variants: 0)
+    monkeypatch.setattr(text_mode, "decide_verdict", lambda signals: "high_verified")
+
+    result = asyncio.run(
+        pipeline_run.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=1,
+            max_tokens=100,
+            code_ground_truth=False,
+        )
+    )
+    assert result.metadata["ensemble_runs_requested"] == 1
+    assert result.metadata["ensemble_runs_effective"] == 2

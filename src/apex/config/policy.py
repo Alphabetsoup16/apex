@@ -7,13 +7,19 @@ from pathlib import Path
 
 from apex.models import AdversarialReview, Finding
 
+# Severities that participate in verdict policy (blocks or ``high_verified`` gating).
+# These must never be removed by ``ignored_types`` / ``ignored_severities`` so policy
+# cannot weaken safety outcomes.
+_VERDICT_RELEVANT_SEVERITIES: frozenset[str] = frozenset({"high", "medium"})
+
 
 @dataclass(frozen=True)
 class FindingsPolicy:
     """
-    Optional policy layer that can filter findings for reporting.
+    Optional policy layer that can filter **low** findings for reporting noise.
 
-    By default, it does not change anything.
+    ``high`` and ``medium`` findings are always kept: they drive blocking and
+    ``high_verified`` eligibility, and must not be stripped by policy configuration.
     """
 
     ignored_types: tuple[str, ...] = ()
@@ -25,6 +31,9 @@ class FindingsPolicy:
 
         filtered: list[Finding] = []
         for f in review.findings:
+            if f.severity in _VERDICT_RELEVANT_SEVERITIES:
+                filtered.append(f)
+                continue
             if self.ignored_severities and f.severity in self.ignored_severities:
                 continue
             if self.ignored_types and f.type in self.ignored_types:

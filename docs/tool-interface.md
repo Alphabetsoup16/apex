@@ -6,10 +6,11 @@ APEX exposes a single MCP tool: `apex.run`.
 
 - `prompt` (string)
 - `mode` (`auto` | `text` | `code`, default: `auto`)
-  - `auto` infers `text` vs `code` from the prompt
+  - `auto` infers `text` vs `code` from a **small keyword heuristic** on the prompt. It can misclassify unusual prompts; use an explicit `mode` when the outcome must be deterministic.
 - `code_ground_truth` (boolean, default: `false`)
   - only applies when `mode=code`
 - `ensemble_runs` (int, default: `3`)
+  - **Clamped** server-side to the inclusive range **2–3** (see `ENSEMBLE_RUNS_MIN_EFFECTIVE` / `ENSEMBLE_RUNS_MAX_EFFECTIVE` in `apex.config.constants`). Metadata includes `ensemble_runs_requested` and `ensemble_runs_effective` on successful runs; top-level failure metadata includes the same fields.
 - `max_tokens` (int, default: `1024`)
 - `known_good_baseline` (string | null, optional)
   - if provided, APEX can downgrade `high_verified` when output divergence is large
@@ -27,11 +28,13 @@ The tool returns JSON shaped like:
 - `verdict`: `high_verified` | `needs_review` | `blocked`
 - `output`: string (best candidate answer, or concatenated code bundle)
 - `metadata`: object (structured run metadata)
-- `adversarial_review`: object | `null`
+- `adversarial_review`: object | `null` (post–findings-policy view; **`high` / `medium` are never removed** by policy — see [configuration.md](configuration.md))
 - `execution`: object | `null` (code-mode execution result, when available)
 
 ### Metadata notes
 
+- `ensemble_runs_requested` / `ensemble_runs_effective`: tool input vs value used after clamping (successful runs).
+- If the run aborts inside `apex_run` before a mode-specific pipeline result is returned (e.g. missing LLM config), `verdict` is `blocked` and metadata includes `error_type`, full `error` string, `mode`, `mode_request`, `mode_inferred` (when `mode=auto`), `timings_ms.total` (wall time including client setup), and an empty `pipeline_steps` list.
 - `metadata.pipeline_steps`: ordered traces for pipeline stages (see [pipeline-steps.md](pipeline-steps.md)); includes `ensemble`, `cot_audit`, and mode-specific follow-on steps (or explicit skip rows for optional stages).
 - If `known_good_baseline` is provided, `metadata.baseline_similarity` may be included.
 - If chain-of-thought leakage is detected, the run is `blocked` and `metadata.cot_audit` is included.

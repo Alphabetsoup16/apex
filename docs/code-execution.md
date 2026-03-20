@@ -5,7 +5,9 @@ When `mode=code` and `code_ground_truth=true`, APEX:
 - Generates two independent pytest suites (`tests_v1` and `tests_v2`)
 - Calls your execution backend for each suite
 
-`high_verified` in code mode is only possible when the backend reports `pass=true` for both suites.
+When `code_ground_truth=true`, `high_verified` additionally requires both suites to report `pass=true` (along with convergence and adversarial gates — see [verification.md](verification.md)).
+
+If `APEX_EXECUTION_BACKEND_URL` is unset or the backend errors, execution may be treated as inconclusive (`needs_review` / pass unknown) per pipeline logic.
 
 ## Endpoint
 
@@ -28,7 +30,7 @@ APEX sends:
 ```json
 {
   "language": "python",
-  "run_id": "string",
+  "run_id": "unique-run-id",
   "files": [{ "path": "solution.py", "content": "..." }],
   "tests": [{ "path": "test_solution.py", "content": "..." }],
   "limits": {
@@ -56,4 +58,10 @@ Your backend should return JSON shaped like:
 ```
 
 `pass`, `stdout`, `stderr`, and `duration_ms` are required.
+
+The client may accept **additional** optional fields on the response (e.g. `exit_code`, `timed_out`, `resource_stats`, `logs`) for observability; APEX maps the core fields into `ExecutionResult`.
+
+## Retries
+
+- `APEX_EXECUTION_BACKEND_RETRIES` (default `2`): retries on transient HTTP **502 / 503 / 504** responses with exponential backoff.
 
