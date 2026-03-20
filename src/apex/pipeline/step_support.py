@@ -84,6 +84,7 @@ def skipped_step_record(
     Stable trace for a stage that did not run (e.g. optional suite disabled by config).
 
     Same shape as ``StepTrace.as_dict()`` so consumers can treat all rows uniformly.
+    See ``apex.pipeline.trace_contract`` for the stable JSON shape (``PipelineStepTraceDict``).
     """
     merged = {"skipped": True, **(detail or {})}
     return StepTrace(

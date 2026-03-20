@@ -12,6 +12,7 @@ from apex.llm.loader import load_llm_client_from_env
 from apex.models import ApexRunToolResult, Mode
 from apex.pipeline.code_mode import run_code_mode
 from apex.pipeline.helpers import infer_mode_from_prompt, temperatures_for_runs
+from apex.pipeline.observability import finalize_run_result
 from apex.pipeline.text_mode import run_text_mode
 
 
@@ -96,16 +97,17 @@ async def apex_run(
                 repo_conventions=effective_conventions,
                 output_mode=output_mode,
             )
-        return _annotate_ensemble_runs_metadata(
+        result = _annotate_ensemble_runs_metadata(
             result,
             ensemble_runs_requested=ensemble_runs_requested,
             ensemble_runs_effective=ensemble_runs,
         )
+        return finalize_run_result(result, run_id=run_id, mode=actual_mode)
     except asyncio.CancelledError:
         raise
     except Exception as e:
         total_ms = int((time.perf_counter() - t_wall_start) * 1000)
-        return ApexRunToolResult(
+        failed = ApexRunToolResult(
             verdict="blocked",
             output=f"APEX blocked due to extraction/verification failure: {type(e).__name__}",
             adversarial_review=None,
@@ -127,3 +129,4 @@ async def apex_run(
                 "pipeline_steps": [],
             },
         )
+        return finalize_run_result(failed, run_id=run_id, mode=actual_mode)

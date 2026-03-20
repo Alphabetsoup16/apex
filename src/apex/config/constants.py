@@ -11,6 +11,10 @@ BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD: float = 0.8
 # signals allow it. Used by ``apex.scoring.decide_verdict``.
 HIGH_VERIFIED_CONVERGENCE_THRESHOLD: float = 0.98
 
+# Below ``HIGH_VERIFIED_CONVERGENCE_THRESHOLD`` but at or above this → ``moderate`` band
+# in ``metadata.uncertainty`` (``apex.pipeline.observability``).
+CONVERGENCE_MODERATE_THRESHOLD: float = 0.85
+
 # When scoring text variants, weight of answer-string similarity vs key-claim
 # similarity (pairwise convergence and best-candidate selection). Must sum to 1.0.
 TEXT_ANSWER_CONVERGENCE_WEIGHT: float = 0.7

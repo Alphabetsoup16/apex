@@ -23,13 +23,23 @@ cd /path/to/apex
 pip install -e .
 ```
 
-Configure Anthropic (default provider):
+Configure the LLM (Anthropic is the default provider). **Either** use the interactive wizard **or** set env vars (env wins if set):
+
+```bash
+apex init
+```
+
+**Or** with environment variables only:
 
 ```bash
 export APEX_LLM_PROVIDER="anthropic"
 export ANTHROPIC_API_KEY="..."
-export ANTHROPIC_MODEL="claude-3-5-sonnet-latest"
+export ANTHROPIC_MODEL="claude-3-5-haiku-latest"
 ```
+
+**Models:** APEX runs **many** LLM calls per run (ensemble paths, adversarial review, inspection, test generation). Prefer **smaller, faster** Anthropic tiers (**Haiku** or **Sonnet**); **Opus** is usually slower, pricier, and rarely needed for this workflow. See [Configuration → model choice](docs/configuration.md#choosing-an-anthropic-model).
+
+See [Configuration](docs/configuration.md) for `~/.apex/config.json`, overrides, and why GitHub Copilot is not a direct option.
 
 Optional: enable executable verification for code mode:
 

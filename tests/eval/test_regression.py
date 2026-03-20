@@ -158,3 +158,7 @@ def test_regression_pipeline_steps_and_verdict(
     assert result.verdict == case.expect_verdict
     steps = result.metadata.get("pipeline_steps") or []
     assert tuple(s["id"] for s in steps) == case.expect_step_ids
+    tel = result.metadata.get("telemetry") or {}
+    assert tel.get("schema") == "apex.telemetry/v1"
+    assert len(tel.get("spans") or []) == len(steps)
+    assert (result.metadata.get("uncertainty") or {}).get("schema") == "apex.uncertainty/v1"

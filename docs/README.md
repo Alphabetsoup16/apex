@@ -13,4 +13,5 @@
 
 - Behavioral tests: `tests/` (patch at the import site used by the module under test; see [architecture.md](architecture.md)).
 - Declarative pipeline regressions: `tests/eval/` (verdict + ordered `pipeline_steps` ids).
+- Trace contract + telemetry helpers: `tests/test_observability.py` (e.g. `validate_pipeline_steps`, `run_wall_ms` from `timings_ms.total`).
 

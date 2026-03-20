@@ -5,6 +5,8 @@ APEX verification pipeline (light layer by default).
 - ``step_support``: ``run_async_step`` + ``StepTrace`` (required vs optional behavior).
 - ``steps_catalog``: declarative ``PipelineStepSpec`` list per mode (keep in sync with code).
 - ``text_mode`` / ``code_mode``: mode-specific flows.
+- ``trace_contract``: required keys + ``PipelineStepTraceDict`` for ``pipeline_steps[]``.
+- ``observability``: ``finalize_run_result`` → ``metadata.telemetry`` + ``metadata.uncertainty``.
 - ``run``: ``apex_run`` entrypoint.
 
 See ``docs/pipeline-steps.md`` for how to add new steps.

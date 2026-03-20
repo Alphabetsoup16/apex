@@ -6,10 +6,63 @@ APEX uses environment variables for configuration.
 
 Currently, only Anthropic is implemented.
 
+### Local wizard (easiest for dev machines)
+
+After `pip install -e .`:
+
+```bash
+apex init              # interactive: API key (hidden), model, base URL → ~/.apex/config.json
+apex init show         # file + env summary (no secrets)
+apex init clear        # remove ~/.apex/config.json
+apex setup             # same as `apex init` (alias)
+```
+
+- **GitHub Copilot** is **not** a selectable provider: it is tied to your editor session and does not expose a supported API for a separate MCP server process. Use Anthropic (or set env vars to hit an OpenAI-compatible proxy you control).
+
+### Environment variables (override file when set)
+
+Highest precedence: if a variable is **non-empty**, it wins over `~/.apex/config.json`.
+
+- `APEX_USER_CONFIG_PATH` — optional path to the JSON file instead of `~/.apex/config.json` (tests, advanced layouts)
 - `APEX_LLM_PROVIDER` (default: `anthropic`)
 - `ANTHROPIC_API_KEY`
 - `ANTHROPIC_MODEL`
 - `ANTHROPIC_BASE_URL` (optional; default: `https://api.anthropic.com`)
+
+### Choosing an Anthropic model
+
+APEX is **call-heavy**: multiple ensemble generations, adversarial review, doc inspection (code), optional test suites, etc. Cost and latency scale with **per-call** pricing and parallelism.
+
+| Tier | When to use |
+|------|----------------|
+| **Haiku** (e.g. `claude-3-5-haiku-latest` or current Haiku id from [Anthropic docs](https://docs.anthropic.com/en/docs/about-claude/models)) | **Default recommendation** for everyday use: lower cost and latency; often enough for structured JSON + review passes. |
+| **Sonnet** (e.g. `claude-3-5-sonnet-latest` or current Sonnet id) | If **generated code or answers** look weak with Haiku, step up here for better reasoning on the same pipeline. |
+| **Opus** | **Usually avoid** for APEX: highest cost/latency; reserve for rare cases where you explicitly need maximum capability and accept the bill. |
+
+Exact model strings change over time—always confirm the id in Anthropic’s model documentation.
+
+### Config file shape (`~/.apex/config.json`)
+
+Written by `apex init` / `apex setup`:
+
+```json
+{
+  "version": 1,
+  "provider": "anthropic",
+  "anthropic_api_key": "...",
+  "anthropic_model": "claude-3-5-haiku-latest",
+  "anthropic_base_url": "https://api.anthropic.com"
+}
+```
+
+On POSIX the config file is chmod **`600`** when possible, and the short-lived `config.json.tmp` used during saves is restricted the same way before rename. **Treat `~/.apex/config.json` like a password file** (plaintext secret).
+
+`apex serve` loads MCP/FastMCP only for that subcommand; `apex init` / `apex setup` do not import the MCP stack.
+
+### CLI output (scripting)
+
+- Normal prompts and summaries go to **stdout**.
+- Errors and fatal messages (e.g. missing API key after `apex llm`) go to **stderr** with a non-zero exit code where applicable.
 
 ## Code Execution Backend (optional)
 

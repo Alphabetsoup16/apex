@@ -33,6 +33,12 @@ The tool returns JSON shaped like:
 
 ### Metadata notes
 
+- **`telemetry`** (`schema`: `apex.telemetry/v1`), added by `finalize_run_result`:
+  - **`trace_id`**, **`root_span_id`**: correlation / exporter-friendly IDs.
+  - **`run_wall_ms`**: from **`timings_ms.total`** when it is a numeric **`int`** or **`float`** (rounded); otherwise **`null`**.
+  - **`spans[]`**: one synthetic span per **`pipeline_steps`** row (`name` = step `id`, plus duration, `ok`, `detail`).
+  - **`trace_validation`**: always present — `{ "ok": bool, "issues": string[] }`. Non-empty **`issues`** means the step list failed contract checks (see [pipeline-steps.md](pipeline-steps.md#trace-contract-validated)); the run still returns normally so operators can alert on **`telemetry.trace_validation.ok`**.
+- **`uncertainty`** (`schema`: `apex.uncertainty/v1`): `convergence`, `convergence_band` (`strong` / `moderate` / `weak` / `unknown`), `ensemble_divergence_hint` (roughly `1 - convergence` when known), adversarial + code-inspection summaries, and **`execution_surface`** for code + ground-truth runs.
 - `ensemble_runs_requested` / `ensemble_runs_effective`: tool input vs value used after clamping (successful runs).
 - If the run aborts inside `apex_run` before a mode-specific pipeline result is returned (e.g. missing LLM config), `verdict` is `blocked` and metadata includes `error_type`, full `error` string, `mode`, `mode_request`, `mode_inferred` (when `mode=auto`), `timings_ms.total` (wall time including client setup), and an empty `pipeline_steps` list.
 - `metadata.pipeline_steps`: ordered traces for pipeline stages (see [pipeline-steps.md](pipeline-steps.md)); includes `ensemble`, `cot_audit`, and mode-specific follow-on steps (or explicit skip rows for optional stages).

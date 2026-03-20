@@ -7,8 +7,8 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 | Area | Location | Responsibility |
 |------|-----------|----------------|
 | MCP entry | `apex.mcp.server` | FastMCP tool wiring (`create_mcp_server`) |
-| CLI | `apex.__main__` | `apex serve` |
-| Pipeline | `apex.pipeline.*` | `apex_run` router, text/code flows, `step_support` + `steps_catalog` |
+| CLI | `apex.__main__` | `apex serve`, `apex init|setup` (+ optional `show`/`clear`) |
+| Pipeline | `apex.pipeline.*` | `apex_run` router, text/code flows, `step_support`, `steps_catalog`, `trace_contract`, `observability` |
 | Models | `apex.models` | Pydantic schemas (tool I/O, findings, code bundles) |
 | Config | `apex.config.*` | Thresholds (`constants`), conventions merge (`conventions`), findings policy (`policy`) |
 | Generation | `apex.generation.*` | Ensemble prompts + variant generation |
@@ -37,6 +37,8 @@ APEX is organized around a **light verification layer** (fast feedback while aut
 - **Guide**: [pipeline-steps.md](pipeline-steps.md).
 
 Successful runs attach `metadata.pipeline_steps` with trace objects for each logical stage (ensemble, CoT audit, reviews, optional skips, etc.); see `docs/pipeline-steps.md`.
+
+- **Observability**: `apex.pipeline.observability.finalize_run_result` validates `pipeline_steps` shape and attaches **`metadata.telemetry`** (`apex.telemetry/v1`) and **`metadata.uncertainty`** (`apex.uncertainty/v1`) on every tool result from `apex_run`.
 
 ## Tests
 

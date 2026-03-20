@@ -15,7 +15,7 @@ flowchart TD
   T8 --> T5{known_good_baseline?}
   T5 -->|yes| T6["Baseline similarity; may downgrade high_verified → needs_review"]
   T5 -->|no| T7["Skip (traced as optional step)"]
-  T6 --> OUT["Return verdict, output, metadata (incl. pipeline_steps)"]
+  T6 --> OUT["Return verdict, output, metadata (pipeline_steps, telemetry, uncertainty)"]
   T7 --> OUT
 
   C -->|code| C1["Generate N code variants (ensemble)"]
@@ -42,4 +42,4 @@ flowchart TD
   C17 --> OUT
 ```
 
-Chart matches current `text_mode` / `code_mode`. **`ensemble_runs`** is clamped to 2–3 (see `apex.config.constants`). With `code_ground_truth` off, execution stages are **skipped** but still appear as explicit rows in `metadata.pipeline_steps`.
+Chart matches current `text_mode` / `code_mode`. **`ensemble_runs`** is clamped to 2–3 (see `apex.config.constants`). With `code_ground_truth` off, execution stages are **skipped** but still appear as explicit rows in `metadata.pipeline_steps`. Every returned tool result also gets **`metadata.telemetry`** and **`metadata.uncertainty`** (see [pipeline-steps.md](pipeline-steps.md#observability-automatic)).
