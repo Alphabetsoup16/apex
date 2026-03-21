@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from typing import Any
 
@@ -8,6 +7,7 @@ import httpx
 from pydantic import ValidationError as PydanticValidationError
 
 from apex.code_ground_truth.executor_client import ExecutionBackendError
+from apex.config.env import env_bool
 
 # Stable, documented codes for MCP clients and operators (do not rename lightly).
 APEX_CONFIGURATION = "apex.configuration"
@@ -46,8 +46,7 @@ def apex_sanitized_error(code: str) -> str:
 
 
 def _expose_error_details() -> bool:
-    v = os.environ.get("APEX_EXPOSE_ERROR_DETAILS", "").strip().lower()
-    return v in ("1", "true", "yes", "y", "on")
+    return env_bool("APEX_EXPOSE_ERROR_DETAILS", default=False)
 
 
 def _walk_causes(start: BaseException | None) -> Iterator[BaseException]:

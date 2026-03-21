@@ -25,9 +25,10 @@
 - **`tests/test_progress_events.py`** — Progress event schema + `run_async_step` hooks.
 - **`tests/test_mcp_input_guard.py`**, **`tests/test_mcp_run_registry.py`** (reserve/bind cancel semantics), **`tests/test_mcp_diagnostics.py`** — MCP helpers (no FastMCP import).
 - **`tests/test_guard_metadata.py`** — Ensemble clamp + blocked metadata shape shared by MCP / ``apex_run``.
+- **`tests/test_config_env.py`** — Central env parsing (`apex.config.env`).
 - **`tests/test_mcp_server_wiring.py`** — With `mcp` installed (`pip install -e .`), asserts all expected tools are registered; otherwise **skipped**.
 - **`tests/test_ledger_read.py`** — `read_ledger_snapshot` API.
-- **`tests/test_resolve_run_modes.py`** — Shared mode resolution helper.
+- **`tests/test_resolve_run_modes.py`** — ``resolve_run_modes`` (``apex.pipeline.run_context``).
 - **`tests/test_runtime_run_limits.py`** — Concurrency gate + wall timeout on `apex_run`.
 - **`tests/test_ledger.py`** — SQLite ledger; **`tests/conftest.py`** sets `APEX_LEDGER_DISABLED=1` so the default DB is not written unless a test clears it.
 - **`tests/test_top_level_errors.py`** — `error_code` / `APEX_EXPOSE_ERROR_DETAILS` (with cases in `test_pipeline_run.py`).

@@ -13,6 +13,7 @@ import apex.pipeline.run as pipeline_run
 import apex.pipeline.text_mode as text_mode
 from apex.ledger import record_apex_run_to_ledger_if_enabled
 from apex.models import AdversarialReview, ApexRunToolResult, Finding, TextCompletion
+from apex.pipeline import run_execute
 from apex.pipeline.observability import finalize_run_result
 
 
@@ -36,7 +37,7 @@ def test_ledger_disabled_does_not_create_db(monkeypatch: pytest.MonkeyPatch, tmp
     default_db = tmp_path / ".apex" / "ledger.sqlite3"
     assert not default_db.exists()
 
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         assert prompt == "hello"
@@ -77,7 +78,7 @@ def test_ledger_enabled_store_step_detail_off(
     monkeypatch.setenv("APEX_LEDGER_PATH", str(db_path))
     monkeypatch.setenv("APEX_LEDGER_STORE_STEP_DETAIL", "0")
 
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         return [TextCompletion(answer="HELLO WORLD", key_claims=["x"])]
@@ -139,7 +140,7 @@ def test_ledger_enabled_store_step_detail_on(
     monkeypatch.setenv("APEX_LEDGER_STORE_STEP_DETAIL", "1")
     monkeypatch.setenv("APEX_LEDGER_MAX_DETAIL_CHARS", "100000")
 
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         return [TextCompletion(answer="HELLO WORLD", key_claims=["x"])]

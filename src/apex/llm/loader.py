@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import os
-
+from apex.config.env import env_str
 from apex.llm.interface import LLMClient
 from apex.llm.providers.anthropic_messages import AnthropicConfig, AnthropicMessagesClient
 from apex.llm.user_config import DEFAULT_ANTHROPIC_BASE_URL, load_user_llm_config
@@ -19,20 +18,20 @@ def load_llm_client_from_env() -> LLMClient:
     """
     file_cfg = load_user_llm_config()
 
-    provider = os.environ.get("APEX_LLM_PROVIDER", "").strip().lower()
+    provider = env_str("APEX_LLM_PROVIDER").lower()
     if not provider:
         provider = str(file_cfg.get("provider") or "anthropic").strip().lower() or "anthropic"
 
     if provider == "anthropic":
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        api_key = env_str("ANTHROPIC_API_KEY")
         if not api_key:
             api_key = str(file_cfg.get("anthropic_api_key") or "").strip()
 
-        model = os.environ.get("ANTHROPIC_MODEL", "").strip()
+        model = env_str("ANTHROPIC_MODEL")
         if not model:
             model = str(file_cfg.get("anthropic_model") or "").strip()
 
-        base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip()
+        base_url = env_str("ANTHROPIC_BASE_URL")
         if not base_url:
             base_url = str(file_cfg.get("anthropic_base_url") or "").strip()
         if not base_url:

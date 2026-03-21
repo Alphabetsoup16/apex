@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+from apex.config.env import env_str
 
 
 def _read_text_file(path: Path, *, max_chars: int) -> str | None:
@@ -36,7 +37,7 @@ def load_effective_conventions(
     """
     parts: list[str] = []
 
-    global_path = os.environ.get("APEX_GLOBAL_CONVENTIONS_PATH", "").strip()
+    global_path = env_str("APEX_GLOBAL_CONVENTIONS_PATH")
     if global_path:
         p = Path(global_path).expanduser()
         txt = _read_text_file(p, max_chars=max_chars)

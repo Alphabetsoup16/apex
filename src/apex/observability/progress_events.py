@@ -17,12 +17,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
+
+from apex.config.env import env_bool
 
 # Stable schema id for consumers (jq, log routers, MCP log tailers).
 PROGRESS_EVENT_SCHEMA = "apex.progress/v1"
@@ -48,13 +49,7 @@ _RUN_ID_CTX: ContextVar[str | None] = ContextVar("apex_progress_run_id", default
 
 def progress_log_enabled() -> bool:
     """True when ``APEX_PROGRESS_LOG`` is a truthy toggle (``1``, ``true``, ``on``, etc.)."""
-    raw = os.environ.get("APEX_PROGRESS_LOG")
-    if raw is None:
-        return False
-    s = raw.strip().lower()
-    if not s:
-        return False
-    return s in ("1", "true", "yes", "y", "on")
+    return env_bool("APEX_PROGRESS_LOG", default=False)
 
 
 @contextmanager

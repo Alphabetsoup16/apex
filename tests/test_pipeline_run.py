@@ -16,6 +16,7 @@ from apex.models import (
     Finding,
     TextCompletion,
 )
+from apex.pipeline import run_execute
 
 
 class _FakeClient:
@@ -36,7 +37,7 @@ def _tests_bundle(v: int) -> CodeTests:
 
 
 def test_apex_run_text_mode_uses_review_and_sets_signals(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         assert client.model == "fake-text"
@@ -101,7 +102,7 @@ def test_apex_run_text_mode_uses_review_and_sets_signals(monkeypatch: pytest.Mon
 def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -181,7 +182,7 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
 def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -252,7 +253,7 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
 
 
 def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -306,7 +307,7 @@ def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.5)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -356,7 +357,7 @@ def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
 def test_apex_run_code_mode_inspection_high_blocks_verdict(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -430,7 +431,7 @@ def test_apex_run_code_mode_inspection_high_blocks_verdict(
 def test_apex_run_code_mode_inspection_medium_does_not_block(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -505,7 +506,7 @@ def test_apex_run_code_mode_inspection_medium_does_not_block(
 def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.5)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -561,12 +562,12 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
 
 
 def test_apex_run_top_level_value_error_uses_sanitized_metadata(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     def boom(**kwargs):
         raise ValueError("missing_test_solution_py")
 
-    monkeypatch.setattr(pipeline_run, "load_effective_conventions", boom)
+    monkeypatch.setattr(run_execute, "load_effective_conventions", boom)
     monkeypatch.delenv("APEX_EXPOSE_ERROR_DETAILS", raising=False)
 
     result = asyncio.run(
@@ -601,7 +602,7 @@ def test_apex_run_top_level_value_error_uses_sanitized_metadata(monkeypatch: pyt
 def test_apex_run_code_ground_truth_false_never_high_verified(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
@@ -659,7 +660,7 @@ def test_apex_run_code_ground_truth_false_never_high_verified(
 def test_apex_run_code_ground_truth_one_suite_fails_blocks(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [_solution_bundle()]
@@ -727,7 +728,7 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
 
 
 def test_apex_run_text_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         return [
@@ -767,7 +768,7 @@ def test_apex_run_text_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
 
 
 def test_apex_run_text_mode_baseline_downgrades_high_verified(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         return [
@@ -803,7 +804,7 @@ def test_apex_run_text_mode_baseline_downgrades_high_verified(monkeypatch: pytes
 def test_apex_run_code_mode_baseline_downgrades_high_verified(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-code"))
     monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
     monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
 
@@ -872,7 +873,7 @@ def test_apex_run_top_level_exception_has_rich_metadata(monkeypatch: pytest.Monk
     def boom() -> None:
         raise RuntimeError(long_msg)
 
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", boom)
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", boom)
     monkeypatch.delenv("APEX_EXPOSE_ERROR_DETAILS", raising=False)
 
     result = asyncio.run(
@@ -909,7 +910,7 @@ def test_apex_run_top_level_exception_includes_error_detail_when_enabled(
     def boom() -> None:
         raise RuntimeError(long_msg)
 
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", boom)
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", boom)
     monkeypatch.setenv("APEX_EXPOSE_ERROR_DETAILS", "1")
 
     result = asyncio.run(
@@ -926,7 +927,7 @@ def test_apex_run_top_level_exception_includes_error_detail_when_enabled(
 
 
 def test_apex_run_success_includes_ensemble_request_metadata(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
 
     async def fake_generate_text_variants(*, client, prompt: str, config):
         return [TextCompletion(answer="ok", key_claims=["x"])]

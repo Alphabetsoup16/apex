@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os
 import sys
 import textwrap
 from getpass import getpass
 
+from apex.config.env import env_str
 from apex.llm.user_config import (
     DEFAULT_ANTHROPIC_BASE_URL,
     DEFAULT_ANTHROPIC_MODEL,
@@ -100,11 +100,11 @@ def cmd_show() -> None:
         lines.append("  (no readable file config)")
     lines.append("")
     lines.append("Environment overrides (non-empty values win over file):")
-    ak = os.environ.get("ANTHROPIC_API_KEY", "")
-    lines.append(f"  APEX_LLM_PROVIDER={os.environ.get('APEX_LLM_PROVIDER', '(unset)')}")
-    lines.append(f"  ANTHROPIC_API_KEY={'set' if ak.strip() else '(unset)'}")
-    lines.append(f"  ANTHROPIC_MODEL={os.environ.get('ANTHROPIC_MODEL', '(unset)')}")
-    lines.append(f"  ANTHROPIC_BASE_URL={os.environ.get('ANTHROPIC_BASE_URL', '(unset)')}")
+    ak = env_str("ANTHROPIC_API_KEY")
+    lines.append(f"  APEX_LLM_PROVIDER={env_str('APEX_LLM_PROVIDER') or '(unset)'}")
+    lines.append(f"  ANTHROPIC_API_KEY={'set' if ak else '(unset)'}")
+    lines.append(f"  ANTHROPIC_MODEL={env_str('ANTHROPIC_MODEL') or '(unset)'}")
+    lines.append(f"  ANTHROPIC_BASE_URL={env_str('ANTHROPIC_BASE_URL') or '(unset)'}")
     _out("\n".join(lines))
 
 

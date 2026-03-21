@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from apex.config.env import env_str
 from apex.models import AdversarialReview, Finding
 
 # Severities that participate in verdict policy (blocks or ``high_verified`` gating).
@@ -66,7 +66,7 @@ def load_findings_policy(*, repo_root: str | None = None) -> FindingsPolicy:
     """
     merged: dict = {}
 
-    global_path = os.environ.get("APEX_GLOBAL_POLICY_PATH", "").strip()
+    global_path = env_str("APEX_GLOBAL_POLICY_PATH")
     if global_path:
         data = _read_json_file(Path(global_path).expanduser())
         if isinstance(data, dict):

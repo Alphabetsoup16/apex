@@ -18,7 +18,8 @@ from apex.mcp.run_registry import (
 from apex.models import ApexRunToolResult, Mode
 from apex.pipeline.guard_metadata import blocked_run_base_metadata, clamp_ensemble_runs
 from apex.pipeline.observability import finalize_run_result
-from apex.pipeline.run import apex_run, resolve_run_modes
+from apex.pipeline.run import apex_run
+from apex.pipeline.run_context import resolve_run_modes
 from apex.pipeline.top_level_errors import (
     APEX_CANCELLED,
     APEX_MCP_CORRELATION,

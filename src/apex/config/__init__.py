@@ -1,5 +1,7 @@
 """
 Runtime configuration: thresholds, merged conventions, optional findings policy.
+
+Environment variable parsing lives in ``apex.config.env`` (shared booleans / ints / strips).
 """
 
 from apex.config.constants import (

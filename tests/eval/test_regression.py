@@ -17,6 +17,7 @@ from apex.models import (
     Finding,
     TextCompletion,
 )
+from apex.pipeline import run_execute
 from tests.eval.cases import ALL_CASES, RegressionCase
 
 
@@ -39,7 +40,7 @@ def _tests_bundle(v: int) -> CodeTests:
 def _patch_for_case(monkeypatch: pytest.MonkeyPatch, case: RegressionCase) -> None:
     if case.mode == "text":
         monkeypatch.setattr(
-            pipeline_run,
+            run_execute,
             "load_llm_client_from_env",
             lambda: _FakeClient("fake-text"),
         )
@@ -87,7 +88,7 @@ def _patch_for_case(monkeypatch: pytest.MonkeyPatch, case: RegressionCase) -> No
 
     elif case.mode == "code":
         monkeypatch.setattr(
-            pipeline_run,
+            run_execute,
             "load_llm_client_from_env",
             lambda: _FakeClient("fake-code"),
         )

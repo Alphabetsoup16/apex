@@ -7,6 +7,8 @@ import stat
 from pathlib import Path
 from typing import Any
 
+from apex.config.env import env_str
+
 CONFIG_VERSION = 1
 # Default for `apex init`: fast/cheap tier fits APEX's many LLM calls per run.
 DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-latest"
@@ -20,7 +22,7 @@ def user_config_path() -> Path:
     Override with ``APEX_USER_CONFIG_PATH`` (absolute or ``~``-expanded path) for tests
     or custom layouts.
     """
-    override = os.environ.get("APEX_USER_CONFIG_PATH", "").strip()
+    override = env_str("APEX_USER_CONFIG_PATH")
     if override:
         return Path(override).expanduser()
     return Path.home() / ".apex" / "config.json"

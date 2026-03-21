@@ -9,12 +9,12 @@ APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **sc
 | MCP | `apex.mcp.server` | FastMCP: `run`, `health`, `describe_config`, `ledger_query`, `cancel_run`, optional `repo_*` ([mcp-tools.md](mcp-tools.md)) |
 | Repo context | `apex.repo_context` | Allowlisted read/glob (env-gated); [repo-context.md](repo-context.md) |
 | CLI | `apex.__main__` | `serve`, `init`/`setup`, `ledger summary` |
-| Pipeline | `apex.pipeline.*` | `apex_run`, text/code modes, steps, traces, `finalize_run_result`, top-level error shaping |
+| Pipeline | `apex.pipeline.*` | `apex_run` (`run.py`), `execute_apex_pipeline` (`run_execute.py`), `ApexRunContext` (`run_context.py`), text/code modes, traces, `finalize_run_result` |
 | Observability | `apex.observability.progress_events` | Optional `APEX_PROGRESS_LOG` JSON lines (`apex.progress` logger); step hooks via `run_async_step` |
 | Runtime limits | `apex.runtime.run_limits` | Optional `APEX_MAX_CONCURRENT_RUNS` / `APEX_RUN_MAX_WALL_MS` ([configuration.md](configuration.md)) |
 | Ledger | `apex.ledger` | SQLite append after finalize (default `~/.apex/ledger.sqlite3`; `APEX_LEDGER_DISABLED=1` off) |
 | Models | `apex.models` | Pydantic tool I/O |
-| Config | `apex.config.*` | Constants, conventions merge, findings policy |
+| Config | `apex.config.*` | Constants, `apex.config.env` (shared env parsing), conventions, findings policy |
 | Generation / Review / Scoring | `apex.generation`, `apex.review`, `apex.scoring` | Used by pipeline, not MCP directly |
 | LLM | `apex.llm.*` | Client protocol, loader, Anthropic provider |
 | Safety | `apex.safety.*` | Redaction, JSON extract, CoT heuristics |
@@ -23,6 +23,7 @@ APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **sc
 ## Entrypoints
 
 - **`apex.pipeline.run.apex_run`** — What `apex.run` calls.
+- **`apex.pipeline.run_execute.execute_apex_pipeline`** — LLM pipeline body (client load, text/code modes, finalize, ledger dispatch). Tests that stub `load_llm_client_from_env` or `run_text_mode` / `run_code_mode` should patch **`apex.pipeline.run_execute`** (where those symbols are bound), not `apex.pipeline.run`.
 - **`apex.pipeline.helpers`** — Shared helpers (`validate_code_bundles`, mode heuristic, etc.).
 
 ## Call direction

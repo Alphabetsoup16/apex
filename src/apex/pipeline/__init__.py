@@ -7,7 +7,9 @@ APEX verification pipeline (light layer by default).
 - ``text_mode`` / ``code_mode``: mode-specific flows.
 - ``trace_contract``: required keys + ``PipelineStepTraceDict`` for ``pipeline_steps[]``.
 - ``observability``: ``finalize_run_result`` → ``metadata.telemetry`` + ``metadata.uncertainty``.
-- ``run``: ``apex_run`` entrypoint.
+- ``run``: ``apex_run`` orchestration (limits, guards, timeout).
+- ``run_context``: frozen ``ApexRunContext`` + ``resolve_run_modes``.
+- ``run_execute``: text/code pipeline body (LLM work, finalize, ledger dispatch).
 - ``guard_metadata``: blocked-run metadata + ensemble clamp (MCP + ``apex_run`` guards).
 
 See ``docs/pipeline-steps.md`` for how to add new steps.

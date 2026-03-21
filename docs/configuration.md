@@ -1,6 +1,6 @@
 # Configuration
 
-Most behavior is controlled with **environment variables**. File-based LLM config is optional; see below.
+Most behavior is controlled with **environment variables**. Parsing helpers (`env_bool`, `env_str`, `env_int`, …) live in **`apex.config.env`** so toggles behave consistently across modules. File-based LLM config is optional; see below.
 
 ## LLM (Anthropic)
 

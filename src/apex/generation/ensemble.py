@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass
 
+from apex.config.env import env_int
 from apex.llm.interface import LLMClient
 from apex.models import CodeSolution, CodeTests, TextCompletion
 
@@ -61,7 +61,7 @@ async def generate_text_variants(
     prompt: str,
     config: EnsembleConfig,
 ) -> list[TextCompletion]:
-    semaphore = asyncio.Semaphore(int(os.environ.get("APEX_LLM_CONCURRENCY", "2")))
+    semaphore = asyncio.Semaphore(max(1, env_int("APEX_LLM_CONCURRENCY", 2)))
 
     async def _one(i: int) -> TextCompletion:
         async with semaphore:
@@ -84,7 +84,7 @@ async def generate_code_solution_variants(
     prompt: str,
     config: EnsembleConfig,
 ) -> list[CodeSolution]:
-    semaphore = asyncio.Semaphore(int(os.environ.get("APEX_LLM_CONCURRENCY", "2")))
+    semaphore = asyncio.Semaphore(max(1, env_int("APEX_LLM_CONCURRENCY", 2)))
 
     async def _one(i: int) -> CodeSolution:
         async with semaphore:

@@ -3,31 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass
 
 from apex.config.constants import (
     RUN_LIMIT_MAX_CONCURRENT_CEILING,
     RUN_LIMIT_MAX_WALL_MS_CEILING,
 )
-
-
-def _parse_nonneg_int_clamped(
-    name: str,
-    *,
-    default: int,
-    ceiling: int,
-) -> int:
-    raw = os.environ.get(name, "").strip()
-    if not raw:
-        return default
-    try:
-        v = int(raw)
-    except ValueError:
-        return default
-    if v <= 0:
-        return 0
-    return min(v, ceiling)
+from apex.config.env import env_int_nonnegative_clamped
 
 
 @dataclass(frozen=True)
@@ -40,12 +22,12 @@ class RunLimitSettings:
 
 def load_run_limit_settings() -> RunLimitSettings:
     return RunLimitSettings(
-        max_concurrent=_parse_nonneg_int_clamped(
+        max_concurrent=env_int_nonnegative_clamped(
             "APEX_MAX_CONCURRENT_RUNS",
             default=0,
             ceiling=RUN_LIMIT_MAX_CONCURRENT_CEILING,
         ),
-        wall_ms=_parse_nonneg_int_clamped(
+        wall_ms=env_int_nonnegative_clamped(
             "APEX_RUN_MAX_WALL_MS",
             default=0,
             ceiling=RUN_LIMIT_MAX_WALL_MS_CEILING,

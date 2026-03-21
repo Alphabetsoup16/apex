@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import sqlite3
 import time
 from dataclasses import dataclass
@@ -11,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from apex.config.constants import LEDGER_QUERY_MAX_LIMIT
+from apex.config.env import env_bool, env_int, env_str
 from apex.models import ApexRunToolResult
 
 _LOG = logging.getLogger(__name__)
@@ -30,9 +30,9 @@ def resolve_ledger_db_path() -> Path | None:
     - ``APEX_LEDGER_DISABLED=1`` (truthy) disables the ledger entirely.
     - Otherwise ``APEX_LEDGER_PATH`` overrides; if unset/empty, ``default_ledger_path()``.
     """
-    if _parse_env_bool("APEX_LEDGER_DISABLED", default=False):
+    if env_bool("APEX_LEDGER_DISABLED", default=False):
         return None
-    override = os.environ.get("APEX_LEDGER_PATH", "").strip()
+    override = env_str("APEX_LEDGER_PATH")
     if override:
         return Path(override).expanduser()
     return default_ledger_path()
@@ -46,20 +46,6 @@ class LedgerConfig:
     busy_timeout_ms: int
 
 
-def _parse_env_bool(name: str, *, default: bool) -> bool:
-    v = os.environ.get(name)
-    if v is None:
-        return default
-    s = v.strip().lower()
-    if not s:
-        return default
-    if s in ("1", "true", "yes", "y", "on"):
-        return True
-    if s in ("0", "false", "no", "n", "off"):
-        return False
-    return default
-
-
 def load_ledger_config() -> LedgerConfig | None:
     """
     Ledger is on by default at ``~/.apex/ledger.sqlite3``.
@@ -70,12 +56,9 @@ def load_ledger_config() -> LedgerConfig | None:
     db_path = resolve_ledger_db_path()
     if db_path is None:
         return None
-    store_step_detail = _parse_env_bool(
-        "APEX_LEDGER_STORE_STEP_DETAIL",
-        default=False,
-    )
-    max_step_detail_chars = int(os.environ.get("APEX_LEDGER_MAX_DETAIL_CHARS", "65536"))
-    busy_timeout_ms = int(os.environ.get("APEX_LEDGER_BUSY_TIMEOUT_MS", "2000"))
+    store_step_detail = env_bool("APEX_LEDGER_STORE_STEP_DETAIL", default=False)
+    max_step_detail_chars = env_int("APEX_LEDGER_MAX_DETAIL_CHARS", 65536)
+    busy_timeout_ms = env_int("APEX_LEDGER_BUSY_TIMEOUT_MS", 2000)
     return LedgerConfig(
         db_path=db_path,
         store_step_detail=store_step_detail,

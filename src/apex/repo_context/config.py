@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,22 +10,7 @@ from apex.config.constants import (
     REPO_CONTEXT_DEFAULT_MAX_GLOB_RESULTS,
     REPO_CONTEXT_DEFAULT_MAX_PATTERN_LEN,
 )
-
-
-def _env_truthy_disabled(name: str) -> bool:
-    v = os.environ.get(name, "").strip().lower()
-    return v in ("1", "true", "yes", "y", "on")
-
-
-def _positive_int(name: str, default: int, *, ceiling: int) -> int:
-    raw = os.environ.get(name, "").strip()
-    if not raw:
-        return min(default, ceiling)
-    try:
-        v = int(raw)
-    except ValueError:
-        return min(default, ceiling)
-    return max(1, min(v, ceiling))
+from apex.config.env import env_bool, env_positive_int_clamped, env_str
 
 
 @dataclass(frozen=True)
@@ -48,23 +32,23 @@ def load_repo_context_config() -> RepoContextConfig | None:
     - Optional: ``APEX_REPO_CONTEXT_MAX_FILE_BYTES``, ``APEX_REPO_CONTEXT_MAX_GLOB_RESULTS``,
       ``APEX_REPO_CONTEXT_MAX_PATTERN_LEN``
     """
-    if _env_truthy_disabled("APEX_REPO_CONTEXT_DISABLED"):
+    if env_bool("APEX_REPO_CONTEXT_DISABLED", default=False):
         return None
-    raw = os.environ.get("APEX_REPO_CONTEXT_ROOT", "").strip()
+    raw = env_str("APEX_REPO_CONTEXT_ROOT")
     if not raw:
         return None
     root = Path(raw).expanduser()
-    max_file = _positive_int(
+    max_file = env_positive_int_clamped(
         "APEX_REPO_CONTEXT_MAX_FILE_BYTES",
         REPO_CONTEXT_DEFAULT_MAX_FILE_BYTES,
         ceiling=REPO_CONTEXT_ABSOLUTE_MAX_FILE_BYTES,
     )
-    max_glob = _positive_int(
+    max_glob = env_positive_int_clamped(
         "APEX_REPO_CONTEXT_MAX_GLOB_RESULTS",
         REPO_CONTEXT_DEFAULT_MAX_GLOB_RESULTS,
         ceiling=REPO_CONTEXT_ABSOLUTE_MAX_GLOB_RESULTS,
     )
-    max_pat = _positive_int(
+    max_pat = env_positive_int_clamped(
         "APEX_REPO_CONTEXT_MAX_PATTERN_LEN",
         REPO_CONTEXT_DEFAULT_MAX_PATTERN_LEN,
         ceiling=512,
