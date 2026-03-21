@@ -1,6 +1,6 @@
 # Robustness & architectural boundaries
 
-This doc is the **engineering contract** for what is guaranteed vs best-effort. It complements [architecture.md](architecture.md) and [safety.md](safety.md).
+Guarantees vs best-effort ([architecture.md](architecture.md), [safety.md](safety.md)).
 
 ## What is deliberately solid
 
@@ -14,6 +14,7 @@ This doc is the **engineering contract** for what is guaranteed vs best-effort. 
 | **Tests without FastMCP** | `apex.mcp` package uses lazy `create_mcp_server`; submodules import without the `mcp` PyPI dependency. |
 | **Ledger reads** | Parameterized SQL; read-only `file:` URIs; bounded `limit`. |
 | **Repo context** | Optional MCP reads only under `APEX_REPO_CONTEXT_ROOT`; no indexer ([repo-context.md](repo-context.md)). |
+| **Run limits** | Env caps ([configuration.md](configuration.md)); semaphore `finally`; wall = `wait_for`. |
 
 ## Best-effort / known limitations
 

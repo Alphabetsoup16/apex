@@ -46,3 +46,8 @@ REPO_CONTEXT_DEFAULT_MAX_PATTERN_LEN: int = 256
 # Hard ceiling even if env asks for more (memory guard).
 REPO_CONTEXT_ABSOLUTE_MAX_FILE_BYTES: int = 5_000_000
 REPO_CONTEXT_ABSOLUTE_MAX_GLOB_RESULTS: int = 500
+
+# --- Whole-run operational limits (``apex.runtime.run_limits``) ---
+RUN_LIMIT_MAX_CONCURRENT_CEILING: int = 256
+# Upper bound for APEX_RUN_MAX_WALL_MS (24h).
+RUN_LIMIT_MAX_WALL_MS_CEILING: int = 86_400_000

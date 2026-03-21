@@ -59,11 +59,19 @@ Change step order or verdict wiring → extend **`tests/eval/`** so regressions 
 
 `finalize_run_result` (`apex.pipeline.observability`):
 
-1. **`validate_pipeline_steps`**
-2. **`metadata.telemetry`** (`apex.telemetry/v1`) — `trace_id`, `root_span_id`, `run_wall_ms` (from numeric `timings_ms.total`), `spans[]` mirroring steps, `trace_validation`
-3. **`metadata.uncertainty`** (`apex.uncertainty/v1`) — convergence band, adversarial/inspection summaries, `execution_surface`, etc.
+```mermaid
+flowchart LR
+  PS[pipeline_steps] --> F[finalize_run_result]
+  F --> T[metadata.telemetry]
+  F --> U[metadata.uncertainty]
+  F --> L[ledger if enabled]
+```
 
-Then **`record_apex_run_to_ledger_if_enabled`** may write SQLite (default **`~/.apex/ledger.sqlite3`**, **`APEX_LEDGER_DISABLED=1`** to stop). [configuration.md#run-ledger-sqlite](configuration.md#run-ledger-sqlite) · **`apex ledger summary`**.
+1. **`validate_pipeline_steps`** → issues in **`telemetry.trace_validation`**
+2. **`metadata.telemetry`** (`apex.telemetry/v1`) — `trace_id`, `root_span_id`, `run_wall_ms` ← `timings_ms.total`, `spans[]` per step, `trace_validation`
+3. **`metadata.uncertainty`** (`apex.uncertainty/v1`) — convergence band, adversarial/inspection, `execution_surface`
+
+**Ledger:** **`record_apex_run_to_ledger_if_enabled`** (default **`~/.apex/ledger.sqlite3`**; **`APEX_LEDGER_DISABLED=1`** off). [configuration.md#run-ledger-sqlite](configuration.md#run-ledger-sqlite) · **`apex ledger summary`**.
 
 ## Live progress (optional)
 

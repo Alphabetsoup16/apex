@@ -16,6 +16,8 @@ APEX_IO = "apex.io"
 APEX_NETWORK = "apex.network"
 APEX_EXECUTION_BACKEND = "apex.execution_backend"
 APEX_INTERNAL = "apex.internal"
+APEX_CAPACITY = "apex.capacity"
+APEX_RUN_TIMEOUT = "apex.run_timeout"
 
 _SANITIZED: dict[str, str] = {
     APEX_CONFIGURATION: (
@@ -27,9 +29,16 @@ _SANITIZED: dict[str, str] = {
     APEX_NETWORK: "A network request to an external service failed.",
     APEX_EXECUTION_BACKEND: "The code execution backend reported an error.",
     APEX_INTERNAL: "An unexpected error occurred during the run.",
+    APEX_CAPACITY: "Too many concurrent APEX runs; try again shortly.",
+    APEX_RUN_TIMEOUT: "The run exceeded its maximum wall-clock time.",
 }
 
 _MAX_DETAIL_CHARS = 8192
+
+
+def apex_sanitized_error(code: str) -> str:
+    """Stable operator-facing string for a known ``error_code``."""
+    return _SANITIZED.get(code, _SANITIZED[APEX_INTERNAL])
 
 
 def _expose_error_details() -> bool:

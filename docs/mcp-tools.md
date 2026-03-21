@@ -1,6 +1,20 @@
 # MCP tools (operator surface)
 
-The server registers multiple **read-mostly** tools plus **`run`**. Schemas use a `schema` field where noted so clients can evolve parsers safely.
+Read-mostly tools plus **`run`**; versioned payloads include a **`schema`** field.
+
+```mermaid
+flowchart LR
+  RUN[run] --> CORE[apex_run]
+  subgraph OP[Operator]
+    H[health]
+    D[describe_config]
+    Q[ledger_query]
+    X[cancel_run]
+  end
+  subgraph RC[Optional repo]
+    R[repo_*]
+  end
+```
 
 ## Repo context (opt-in filesystem)
 
@@ -10,7 +24,7 @@ Bounded reads under **`APEX_REPO_CONTEXT_ROOT`**: `repo_context_status`, `repo_r
 
 - **Schema:** `apex.health/v1`
 - **Secrets:** none
-- **Fields (non-exhaustive):** `apex_version`, `python_version`, `llm_provider_default`, `ledger_enabled`, `ledger_path_configured`, `execution_backend_configured`, `progress_log_enabled`
+- **Fields (non-exhaustive):** `apex_version`, `python_version`, `llm_provider_default`, `ledger_*`, `execution_backend_configured`, `progress_log_enabled`, `repo_context_enabled`, `run_limits` (`{max_concurrent, wall_ms}`; `0` = off)
 
 ## `describe_config`
 

@@ -1,5 +1,7 @@
 # Documentation index
 
+**Diagrams:** [flow.md](flow.md) (run pipeline), [architecture.md](architecture.md#call-direction) (adapter vs core), [mcp-tools.md](mcp-tools.md) (tool groups), [verification.md](verification.md#how-a-verdict-is-built) (verdict), [pipeline-steps.md](pipeline-steps.md#observability-automatic) (finalize + ledger), [code-execution.md](code-execution.md#endpoint) (backend POST).
+
 | Doc | What it covers |
 |-----|----------------|
 | [architecture.md](architecture.md) | Package layout, entrypoints, how pieces fit |
@@ -25,5 +27,6 @@
 - **`tests/test_mcp_server_wiring.py`** — With `mcp` installed (`pip install -e .`), asserts all expected tools are registered; otherwise **skipped**.
 - **`tests/test_ledger_read.py`** — `read_ledger_snapshot` API.
 - **`tests/test_resolve_run_modes.py`** — Shared mode resolution helper.
+- **`tests/test_runtime_run_limits.py`** — Concurrency gate + wall timeout on `apex_run`.
 - **`tests/test_ledger.py`** — SQLite ledger; **`tests/conftest.py`** sets `APEX_LEDGER_DISABLED=1` so the default DB is not written unless a test clears it.
 - **`tests/test_top_level_errors.py`** — `error_code` / `APEX_EXPOSE_ERROR_DETAILS` (with cases in `test_pipeline_run.py`).

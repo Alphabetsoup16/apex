@@ -14,6 +14,16 @@
 
 Numeric gates: **`apex.config.constants`** (e.g. `HIGH_VERIFIED_CONVERGENCE_THRESHOLD`).
 
+```mermaid
+flowchart TD
+  G[Ensemble convergence adversarial inspection execution] --> C{Candidate verdict}
+  C -->|blocked| B[blocked]
+  C -->|needs_review| NR[needs_review]
+  C -->|high_verified| K{known_good_baseline low similarity?}
+  K -->|yes| NR
+  K -->|no| HV[high_verified]
+```
+
 ## Verdicts
 
 **`high_verified`**

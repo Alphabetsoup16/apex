@@ -1,6 +1,6 @@
-# Progress events (document streaming)
+# Progress events (structured logs)
 
-Structured **run- and step-level progress** for long `apex_run` invocations. This is **not** LLM token streaming: model output is still delivered only as part of the final tool result (and redaction rules still apply).
+**Run- and step-level** JSON on logger **`apex.progress`**. Not LLM token streaming: model output appears only in the final tool result (redaction still applies).
 
 ## Enable
 
@@ -37,6 +37,7 @@ Additional fields depend on `kind`. Values are JSON-safe scalars or stringified 
 | `ledger_dispatch` | Before ledger write attempt | `ledger_enabled` |
 | `run_complete` | Successful or error-path completion | `verdict` |
 | `run_error` | Top-level exception before blocked result | `error_type` (exception class name only) |
+| `run_rejected` | Run did not start or was cut off by a **host limit** | `reason`: `capacity` (`max_concurrent`) or `wall_timeout` (`wall_timeout_ms`) |
 
 ## Context
 

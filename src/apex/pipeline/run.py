@@ -21,6 +21,7 @@ from apex.observability.progress_events import (
     PIPELINE_EXIT,
     RUN_COMPLETE,
     RUN_ERROR,
+    RUN_REJECTED,
     RUN_START,
     emit_progress,
     progress_run_scope,
@@ -29,7 +30,13 @@ from apex.pipeline.code_mode import run_code_mode
 from apex.pipeline.helpers import infer_mode_from_prompt, temperatures_for_runs
 from apex.pipeline.observability import finalize_run_result
 from apex.pipeline.text_mode import run_text_mode
-from apex.pipeline.top_level_errors import build_top_level_error_metadata
+from apex.pipeline.top_level_errors import (
+    APEX_CAPACITY,
+    APEX_RUN_TIMEOUT,
+    apex_sanitized_error,
+    build_top_level_error_metadata,
+)
+from apex.runtime.run_limits import load_run_limit_settings, run_concurrency_gate
 from apex.safety.run_input_limits import validate_run_inputs
 
 
@@ -45,6 +52,35 @@ def resolve_run_modes(
     else:
         actual_mode = "text" if mode == "text" else "code"
     return actual_mode, inferred
+
+
+def _blocked_run_base_metadata(
+    *,
+    run_id: str,
+    actual_mode: Literal["text", "code"],
+    mode: Mode,
+    inferred: Literal["text", "code"],
+    ensemble_runs_requested: int,
+    ensemble_runs: int,
+    max_tokens: int,
+    output_mode: str,
+    code_ground_truth: bool,
+    timings_total_ms: int,
+) -> dict[str, object]:
+    """Shared keys for ``verdict=blocked`` results that never entered the pipeline."""
+    return {
+        "run_id": run_id,
+        "mode": actual_mode,
+        "mode_request": mode,
+        "mode_inferred": inferred if mode == "auto" else None,
+        "ensemble_runs_requested": ensemble_runs_requested,
+        "ensemble_runs_effective": ensemble_runs,
+        "max_tokens": max_tokens,
+        "output_mode": output_mode,
+        "ground_truth_enabled": code_ground_truth,
+        "pipeline_steps": [],
+        "timings_ms": {"total": timings_total_ms},
+    }
 
 
 def _annotate_ensemble_runs_metadata(
@@ -107,133 +143,226 @@ async def apex_run(
             adversarial_review=None,
             execution=None,
             metadata={
-                "run_id": run_id,
-                "mode": actual_mode,
-                "mode_request": mode,
-                "mode_inferred": inferred if mode == "auto" else None,
-                "ensemble_runs_requested": ensemble_runs_requested,
-                "ensemble_runs_effective": ensemble_runs,
-                "max_tokens": max_tokens,
-                "output_mode": output_mode,
-                "code_ground_truth": code_ground_truth,
-                "ground_truth_enabled": code_ground_truth,
+                **_blocked_run_base_metadata(
+                    run_id=run_id,
+                    actual_mode=actual_mode,
+                    mode=mode,
+                    inferred=inferred,
+                    ensemble_runs_requested=ensemble_runs_requested,
+                    ensemble_runs=ensemble_runs,
+                    max_tokens=max_tokens,
+                    output_mode=output_mode,
+                    code_ground_truth=code_ground_truth,
+                    timings_total_ms=0,
+                ),
                 "error": bad_in,
                 "input_validation": True,
-                "pipeline_steps": [],
-                "timings_ms": {"total": 0},
             },
         )
         finalized = finalize_run_result(failed, run_id=run_id, mode=actual_mode)
         await record_apex_run_to_ledger_if_enabled(finalized)
         return finalized
 
-    t_wall_start = time.perf_counter()
-    with progress_run_scope(run_id):
-        emit_progress(
-            RUN_START,
-            mode_request=mode,
-            mode_effective=actual_mode,
-            mode_inferred=inferred if mode == "auto" else None,
-            ensemble_runs_effective=ensemble_runs,
-            ensemble_runs_requested=ensemble_runs_requested,
-            max_tokens=max_tokens,
-            code_ground_truth=code_ground_truth,
-            output_mode=output_mode,
-        )
-        try:
-            client = load_llm_client_from_env()
-            effective_conventions = load_effective_conventions(repo_conventions=repo_conventions)
-            emit_progress(
-                CLIENT_READY,
-                llm_provider=(os.environ.get("APEX_LLM_PROVIDER", "").strip() or "anthropic"),
-            )
-            t_total_start = time.perf_counter()
-            temps = temperatures_for_runs(ensemble_runs)
-            cfg = EnsembleConfig(runs=ensemble_runs, temperatures=temps, max_tokens=max_tokens)
-
-            emit_progress(PIPELINE_ENTER, pipeline=actual_mode)
-            if actual_mode == "text":
-                result = await run_text_mode(
-                    client=client,
-                    prompt=prompt,
-                    cfg=cfg,
-                    ensemble_runs=ensemble_runs,
-                    max_tokens=max_tokens,
-                    actual_mode=actual_mode,
-                    run_id=run_id,
-                    t_total_start=t_total_start,
-                    known_good_baseline=known_good_baseline,
-                    language=language,
-                    diff=diff,
-                    repo_conventions=effective_conventions,
-                    output_mode=output_mode,
+    limits = load_run_limit_settings()
+    gate = run_concurrency_gate(limits.max_concurrent)
+    slot_held = False
+    if gate is not None:
+        if not await gate.try_acquire():
+            with progress_run_scope(run_id):
+                emit_progress(
+                    RUN_REJECTED,
+                    reason="capacity",
+                    max_concurrent=limits.max_concurrent,
                 )
-            else:
-                result = await run_code_mode(
-                    client=client,
-                    prompt=prompt,
-                    cfg=cfg,
-                    ensemble_runs=ensemble_runs,
-                    max_tokens=max_tokens,
-                    actual_mode=actual_mode,
-                    code_ground_truth=code_ground_truth,
-                    run_id=run_id,
-                    t_total_start=t_total_start,
-                    known_good_baseline=known_good_baseline,
-                    language=language,
-                    diff=diff,
-                    repo_conventions=effective_conventions,
-                    output_mode=output_mode,
-                    supplementary_context=supplementary_context,
-                )
-            emit_progress(
-                PIPELINE_EXIT,
-                pipeline=actual_mode,
-                verdict=result.verdict,
-            )
-            result = _annotate_ensemble_runs_metadata(
-                result,
-                ensemble_runs_requested=ensemble_runs_requested,
-                ensemble_runs_effective=ensemble_runs,
-            )
-            emit_progress(FINALIZE_BEGIN)
-            finalized = finalize_run_result(result, run_id=run_id, mode=actual_mode)
-            emit_progress(FINALIZE_END)
-            emit_progress(LEDGER_DISPATCH, ledger_enabled=load_ledger_config() is not None)
-            await record_apex_run_to_ledger_if_enabled(finalized)
-            emit_progress(RUN_COMPLETE, verdict=finalized.verdict)
-            return finalized
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            emit_progress(RUN_ERROR, error_type=type(e).__name__)
-            total_ms = int((time.perf_counter() - t_wall_start) * 1000)
-            err_meta = build_top_level_error_metadata(e)
+            cap_msg = apex_sanitized_error(APEX_CAPACITY)
             failed = ApexRunToolResult(
                 verdict="blocked",
-                output=f"APEX blocked: {err_meta['error']}",
+                output=cap_msg,
                 adversarial_review=None,
                 execution=None,
                 metadata={
-                    "run_id": run_id,
-                    "mode": actual_mode,
-                    "mode_request": mode,
-                    "mode_inferred": inferred if mode == "auto" else None,
-                    "ensemble_runs_requested": ensemble_runs_requested,
-                    "ensemble_runs_effective": ensemble_runs,
-                    "max_tokens": max_tokens,
-                    "output_mode": output_mode,
-                    "code_ground_truth": code_ground_truth,
-                    "ground_truth_enabled": code_ground_truth,
-                    "timings_ms": {"total": total_ms},
-                    "pipeline_steps": [],
-                    **err_meta,
+                    **_blocked_run_base_metadata(
+                        run_id=run_id,
+                        actual_mode=actual_mode,
+                        mode=mode,
+                        inferred=inferred,
+                        ensemble_runs_requested=ensemble_runs_requested,
+                        ensemble_runs=ensemble_runs,
+                        max_tokens=max_tokens,
+                        output_mode=output_mode,
+                        code_ground_truth=code_ground_truth,
+                        timings_total_ms=0,
+                    ),
+                    "error_code": APEX_CAPACITY,
+                    "error": cap_msg,
+                    "error_type": "CapacityExceeded",
+                    "capacity_limit": limits.max_concurrent,
                 },
             )
-            emit_progress(FINALIZE_BEGIN)
             finalized = finalize_run_result(failed, run_id=run_id, mode=actual_mode)
-            emit_progress(FINALIZE_END)
-            emit_progress(LEDGER_DISPATCH, ledger_enabled=load_ledger_config() is not None)
             await record_apex_run_to_ledger_if_enabled(finalized)
-            emit_progress(RUN_COMPLETE, verdict=finalized.verdict)
             return finalized
+        slot_held = True
+
+    outer_t0 = time.perf_counter()
+
+    async def _pipeline() -> ApexRunToolResult:
+        t_wall_start = time.perf_counter()
+        with progress_run_scope(run_id):
+            emit_progress(
+                RUN_START,
+                mode_request=mode,
+                mode_effective=actual_mode,
+                mode_inferred=inferred if mode == "auto" else None,
+                ensemble_runs_effective=ensemble_runs,
+                ensemble_runs_requested=ensemble_runs_requested,
+                max_tokens=max_tokens,
+                code_ground_truth=code_ground_truth,
+                output_mode=output_mode,
+            )
+            try:
+                client = load_llm_client_from_env()
+                effective_conventions = load_effective_conventions(
+                    repo_conventions=repo_conventions,
+                )
+                emit_progress(
+                    CLIENT_READY,
+                    llm_provider=(os.environ.get("APEX_LLM_PROVIDER", "").strip() or "anthropic"),
+                )
+                t_total_start = time.perf_counter()
+                temps = temperatures_for_runs(ensemble_runs)
+                cfg = EnsembleConfig(runs=ensemble_runs, temperatures=temps, max_tokens=max_tokens)
+
+                emit_progress(PIPELINE_ENTER, pipeline=actual_mode)
+                if actual_mode == "text":
+                    result = await run_text_mode(
+                        client=client,
+                        prompt=prompt,
+                        cfg=cfg,
+                        ensemble_runs=ensemble_runs,
+                        max_tokens=max_tokens,
+                        actual_mode=actual_mode,
+                        run_id=run_id,
+                        t_total_start=t_total_start,
+                        known_good_baseline=known_good_baseline,
+                        language=language,
+                        diff=diff,
+                        repo_conventions=effective_conventions,
+                        output_mode=output_mode,
+                    )
+                else:
+                    result = await run_code_mode(
+                        client=client,
+                        prompt=prompt,
+                        cfg=cfg,
+                        ensemble_runs=ensemble_runs,
+                        max_tokens=max_tokens,
+                        actual_mode=actual_mode,
+                        code_ground_truth=code_ground_truth,
+                        run_id=run_id,
+                        t_total_start=t_total_start,
+                        known_good_baseline=known_good_baseline,
+                        language=language,
+                        diff=diff,
+                        repo_conventions=effective_conventions,
+                        output_mode=output_mode,
+                        supplementary_context=supplementary_context,
+                    )
+                emit_progress(
+                    PIPELINE_EXIT,
+                    pipeline=actual_mode,
+                    verdict=result.verdict,
+                )
+                result = _annotate_ensemble_runs_metadata(
+                    result,
+                    ensemble_runs_requested=ensemble_runs_requested,
+                    ensemble_runs_effective=ensemble_runs,
+                )
+                emit_progress(FINALIZE_BEGIN)
+                finalized = finalize_run_result(result, run_id=run_id, mode=actual_mode)
+                emit_progress(FINALIZE_END)
+                emit_progress(LEDGER_DISPATCH, ledger_enabled=load_ledger_config() is not None)
+                await record_apex_run_to_ledger_if_enabled(finalized)
+                emit_progress(RUN_COMPLETE, verdict=finalized.verdict)
+                return finalized
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                emit_progress(RUN_ERROR, error_type=type(e).__name__)
+                total_ms = int((time.perf_counter() - t_wall_start) * 1000)
+                err_meta = build_top_level_error_metadata(e)
+                failed = ApexRunToolResult(
+                    verdict="blocked",
+                    output=f"APEX blocked: {err_meta['error']}",
+                    adversarial_review=None,
+                    execution=None,
+                    metadata={
+                        **_blocked_run_base_metadata(
+                            run_id=run_id,
+                            actual_mode=actual_mode,
+                            mode=mode,
+                            inferred=inferred,
+                            ensemble_runs_requested=ensemble_runs_requested,
+                            ensemble_runs=ensemble_runs,
+                            max_tokens=max_tokens,
+                            output_mode=output_mode,
+                            code_ground_truth=code_ground_truth,
+                            timings_total_ms=total_ms,
+                        ),
+                        **err_meta,
+                    },
+                )
+                emit_progress(FINALIZE_BEGIN)
+                finalized = finalize_run_result(failed, run_id=run_id, mode=actual_mode)
+                emit_progress(FINALIZE_END)
+                emit_progress(LEDGER_DISPATCH, ledger_enabled=load_ledger_config() is not None)
+                await record_apex_run_to_ledger_if_enabled(finalized)
+                emit_progress(RUN_COMPLETE, verdict=finalized.verdict)
+                return finalized
+
+    try:
+        if limits.wall_ms > 0:
+            try:
+                return await asyncio.wait_for(_pipeline(), timeout=limits.wall_ms / 1000.0)
+            except TimeoutError:
+                total_ms = int((time.perf_counter() - outer_t0) * 1000)
+                to_msg = apex_sanitized_error(APEX_RUN_TIMEOUT)
+                with progress_run_scope(run_id):
+                    emit_progress(
+                        RUN_REJECTED,
+                        reason="wall_timeout",
+                        wall_timeout_ms=limits.wall_ms,
+                    )
+                failed = ApexRunToolResult(
+                    verdict="blocked",
+                    output=to_msg,
+                    adversarial_review=None,
+                    execution=None,
+                    metadata={
+                        **_blocked_run_base_metadata(
+                            run_id=run_id,
+                            actual_mode=actual_mode,
+                            mode=mode,
+                            inferred=inferred,
+                            ensemble_runs_requested=ensemble_runs_requested,
+                            ensemble_runs=ensemble_runs,
+                            max_tokens=max_tokens,
+                            output_mode=output_mode,
+                            code_ground_truth=code_ground_truth,
+                            timings_total_ms=total_ms,
+                        ),
+                        "error_code": APEX_RUN_TIMEOUT,
+                        "error": to_msg,
+                        "error_type": "RunWallTimeout",
+                        "run_wall_timeout_ms": limits.wall_ms,
+                    },
+                )
+                finalized = finalize_run_result(failed, run_id=run_id, mode=actual_mode)
+                await record_apex_run_to_ledger_if_enabled(finalized)
+                return finalized
+        return await _pipeline()
+    except asyncio.CancelledError:
+        raise
+    finally:
+        if slot_held and gate is not None:
+            await gate.release()

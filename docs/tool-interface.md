@@ -1,6 +1,6 @@
 # Tool interface (MCP)
 
-The MCP server exposes **`run`** plus small **operator** tools (`health`, `describe_config`, `ledger_query`, `cancel_run`). Full tool list and schemas: [mcp-tools.md](mcp-tools.md).
+The MCP server exposes **`run`** plus **operator** tools (`health`, `describe_config`, `ledger_query`, `cancel_run`). [mcp-tools.md](mcp-tools.md) · pipeline map: [flow.md](flow.md).
 
 Inputs to **`run`** are validated by FastMCP / Pydantic; outputs are JSON-serializable. String **size / NUL** bounds are enforced inside **`apex_run`** via `apex.safety.run_input_limits` (same rules for MCP and embedders).
 
@@ -38,6 +38,8 @@ Inputs to **`run`** are validated by FastMCP / Pydantic; outputs are JSON-serial
 - **`input_validation`** — `true` when the run was blocked by input limit checks (oversize / NUL).
 - **`mcp_correlation_rejected`** — `true` when `correlation_id` was already in use.
 - **`cancelled`** — `true` when the in-flight task was cooperatively cancelled.
+- **`capacity_limit`** — Present when `error_code` is **`apex.capacity`** (host concurrent-run cap).
+- **`run_wall_timeout_ms`** — Present when `error_code` is **`apex.run_timeout`**.
 
 ### `metadata.telemetry` (`apex.telemetry/v1`)
 
@@ -58,7 +60,7 @@ If the run **crashes before** a normal pipeline result (e.g. bad config), you st
 
 | Key | Purpose |
 |-----|---------|
-| `error_code` | Stable: `apex.configuration`, `apex.validation`, `apex.network`, `apex.execution_backend`, `apex.internal`, … |
+| `error_code` | Stable: `apex.configuration`, `apex.validation`, `apex.network`, `apex.execution_backend`, `apex.internal`, `apex.capacity`, `apex.run_timeout`, … |
 | `error` | **Sanitized** message for any client |
 | `error_type` | Exception class name (do not branch product logic on it) |
 | `error_detail` | Only if **`APEX_EXPOSE_ERROR_DETAILS`** is set — raw message, truncated ~8k |

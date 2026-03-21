@@ -41,6 +41,7 @@ FINALIZE_END = "finalize_end"
 LEDGER_DISPATCH = "ledger_dispatch"
 RUN_COMPLETE = "run_complete"
 RUN_ERROR = "run_error"
+RUN_REJECTED = "run_rejected"
 
 _RUN_ID_CTX: ContextVar[str | None] = ContextVar("apex_progress_run_id", default=None)
 

@@ -7,9 +7,17 @@ When `mode=code` and `code_ground_truth=true`, APEX:
 
 When `code_ground_truth=true`, `high_verified` additionally requires both suites to report `pass=true` (along with convergence and adversarial gates — see [verification.md](verification.md)).
 
-If `APEX_EXECUTION_BACKEND_URL` is unset or the backend errors, execution may be treated as inconclusive (`needs_review` / pass unknown) per pipeline logic.
+If `APEX_EXECUTION_BACKEND_URL` is unset or the backend errors, execution may be inconclusive (`needs_review` / pass unknown) per pipeline logic.
 
 ## Endpoint
+
+```mermaid
+sequenceDiagram
+  participant A as APEX
+  participant B as Backend
+  A->>B: POST .../execute JSON body
+  B-->>A: JSON pass stdout stderr duration_ms
+```
 
 APEX will `POST` JSON to:
 

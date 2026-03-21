@@ -14,6 +14,7 @@ from apex.ledger import load_ledger_config, resolve_ledger_db_path
 from apex.llm.user_config import load_user_llm_config, user_config_path
 from apex.observability.progress_events import progress_log_enabled
 from apex.repo_context.config import load_repo_context_config
+from apex.runtime.run_limits import load_run_limit_settings
 
 
 def _package_version() -> str:
@@ -32,6 +33,7 @@ def build_health_snapshot() -> dict[str, object]:
     ledger_path = resolve_ledger_db_path()
     ledger_cfg = load_ledger_config()
     exec_url = os.environ.get("APEX_EXECUTION_BACKEND_URL", "").strip()
+    lim = load_run_limit_settings()
     return {
         "schema": "apex.health/v1",
         "apex_version": _package_version(),
@@ -42,6 +44,7 @@ def build_health_snapshot() -> dict[str, object]:
         "execution_backend_configured": bool(exec_url),
         "progress_log_enabled": progress_log_enabled(),
         "repo_context_enabled": load_repo_context_config() is not None,
+        "run_limits": {"max_concurrent": lim.max_concurrent, "wall_ms": lim.wall_ms},
     }
 
 

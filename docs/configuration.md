@@ -85,9 +85,18 @@ If `apex_run` hits an **uncaught** exception before building a normal pipeline r
 |----------|--------|
 | `APEX_EXPOSE_ERROR_DETAILS` | If truthy, adds **`error_detail`**: raw message truncated (~8k). **Avoid** on untrusted or multi-tenant MCP hosts. |
 
-## Concurrency
+## Concurrency & run limits
 
-`APEX_LLM_CONCURRENCY` (default `2`) caps concurrent ensemble generation.
+`APEX_LLM_CONCURRENCY` (default `2`) caps concurrent **ensemble** LLM calls inside a single run.
+
+**Whole-run** (process-wide) caps:
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `APEX_MAX_CONCURRENT_RUNS` | `0` (off) | Max concurrent `apex_run` invocations; extra calls → `verdict: blocked`, `error_code: apex.capacity` |
+| `APEX_RUN_MAX_WALL_MS` | `0` (off) | Wall-clock timeout for the main pipeline body → `error_code: apex.run_timeout` |
+
+Values are clamped (`RUN_LIMIT_*_CEILING` in `apex.config.constants`). See [robustness.md](robustness.md).
 
 ## Progress events (structured logs)
 
@@ -106,12 +115,17 @@ Each finished `apex_run` can append one row + step rows to a local DB (WAL). Cre
 | — | Default file: **`~/.apex/ledger.sqlite3`** (logging **on**) |
 | `APEX_LEDGER_DISABLED` | Truthy → no writes; `apex ledger` reports disabled |
 | `APEX_LEDGER_PATH` | Override DB path |
+| `APEX_LEDGER_STORE_STEP_DETAIL` | `0` (default): omit `pipeline_steps[*].detail` in DB. `1`: store JSON (truncated) |
+| `APEX_LEDGER_MAX_DETAIL_CHARS` | Default `65536` |
+| `APEX_LEDGER_BUSY_TIMEOUT_MS` | Default `2000` |
 
-**Inspect JSON:** `apex ledger query` (same data shape as MCP `ledger_query`). Optional `--limit`, `--run-id`.
+**CLI:** `apex ledger` / `apex ledger summary` — counts, verdict breakdown, trace-validation failures, recent runs.
+
+**Inspect JSON:** `apex ledger query` (same shape as MCP `ledger_query`). Optional `--limit`, `--run-id`.
 
 ## Repo context (MCP read tools)
 
-Optional allowlisted filesystem reads for `repo_read_file` / `repo_glob`. [repo-context.md](repo-context.md).
+Optional allowlisted reads. [repo-context.md](repo-context.md).
 
 | Variable | Effect |
 |----------|--------|
@@ -120,11 +134,6 @@ Optional allowlisted filesystem reads for `repo_read_file` / `repo_glob`. [repo-
 | `APEX_REPO_CONTEXT_MAX_FILE_BYTES` | Per-file read cap |
 | `APEX_REPO_CONTEXT_MAX_GLOB_RESULTS` | Max matches per glob |
 | `APEX_REPO_CONTEXT_MAX_PATTERN_LEN` | Max pattern string length |
-| `APEX_LEDGER_STORE_STEP_DETAIL` | `0` (default): no `pipeline_steps[*].detail` payload in DB. `1`: store JSON, truncated |
-| `APEX_LEDGER_MAX_DETAIL_CHARS` | Default `65536` |
-| `APEX_LEDGER_BUSY_TIMEOUT_MS` | Default `2000` |
-
-**CLI:** `apex ledger` / `apex ledger summary` — counts, verdict breakdown, trace-validation failures, recent runs.
 
 ## Conventions merge
 
