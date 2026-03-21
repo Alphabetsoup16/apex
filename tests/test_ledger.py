@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import logging
 import sqlite3
 import sys
 from pathlib import Path
@@ -10,7 +11,9 @@ import pytest
 import apex.ledger as ledger_mod
 import apex.pipeline.run as pipeline_run
 import apex.pipeline.text_mode as text_mode
-from apex.models import AdversarialReview, Finding, TextCompletion
+from apex.ledger import record_apex_run_to_ledger_if_enabled
+from apex.models import AdversarialReview, ApexRunToolResult, Finding, TextCompletion
+from apex.pipeline.observability import finalize_run_result
 
 
 class _FakeClient:
@@ -259,3 +262,33 @@ def test_ledger_summary_with_one_run(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert "Total runs: 1" in out
     assert "needs_review" in out
     assert "rid-1" in out
+
+
+def test_ledger_write_failure_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("APEX_LEDGER_DISABLED", raising=False)
+    db = tmp_path / "ledger.sqlite3"
+    monkeypatch.setenv("APEX_LEDGER_PATH", str(db))
+
+    raw = ApexRunToolResult(
+        verdict="needs_review",
+        output="ok",
+        metadata={
+            "run_id": "rid-log-test",
+            "mode": "text",
+            "pipeline_steps": [],
+        },
+    )
+    fin = finalize_run_result(raw, run_id="rid-log-test", mode="text")
+
+    def _boom(*_a: object, **_k: object) -> None:
+        raise OSError("simulated ledger failure")
+
+    monkeypatch.setattr(ledger_mod, "_record_sync", _boom)
+
+    caplog.set_level(logging.WARNING, logger="apex.ledger")
+    asyncio.run(record_apex_run_to_ledger_if_enabled(fin))
+    assert any("ledger write failed" in r.message for r in caplog.records)

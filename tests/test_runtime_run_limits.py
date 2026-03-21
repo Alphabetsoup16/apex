@@ -101,8 +101,15 @@ def test_apex_run_wall_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_apex_sanitized_error_new_codes() -> None:
-    from apex.pipeline.top_level_errors import APEX_INTERNAL, apex_sanitized_error
+    from apex.pipeline.top_level_errors import (
+        APEX_CANCELLED,
+        APEX_INTERNAL,
+        APEX_MCP_CORRELATION,
+        apex_sanitized_error,
+    )
 
     assert "concurrent" in apex_sanitized_error(APEX_CAPACITY).lower()
     assert "time" in apex_sanitized_error(APEX_RUN_TIMEOUT).lower()
+    assert "cancel" in apex_sanitized_error(APEX_CANCELLED).lower()
+    assert "correlation" in apex_sanitized_error(APEX_MCP_CORRELATION).lower()
     assert apex_sanitized_error("apex.unknown_code") == apex_sanitized_error(APEX_INTERNAL)

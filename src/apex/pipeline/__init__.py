@@ -8,6 +8,7 @@ APEX verification pipeline (light layer by default).
 - ``trace_contract``: required keys + ``PipelineStepTraceDict`` for ``pipeline_steps[]``.
 - ``observability``: ``finalize_run_result`` → ``metadata.telemetry`` + ``metadata.uncertainty``.
 - ``run``: ``apex_run`` entrypoint.
+- ``guard_metadata``: blocked-run metadata + ensemble clamp (MCP + ``apex_run`` guards).
 
 See ``docs/pipeline-steps.md`` for how to add new steps.
 

@@ -1,8 +1,8 @@
 """
 Track in-flight ``apex.run`` tasks by optional ``correlation_id`` for cooperative cancel.
 
-``asyncio.Task.cancel()`` is best-effort: cancellation propagates only at ``await``
-points inside ``apex_run`` (which re-raises :class:`asyncio.CancelledError`).
+Reservation happens **before** ``create_task`` so ``cancel_run`` never returns ``not_found`` for an
+id the server has already accepted. ``asyncio.Task.cancel()`` is best-effort (``await`` boundaries).
 """
 
 from __future__ import annotations
@@ -13,33 +13,46 @@ from typing import Any
 from apex.config.constants import MCP_CORRELATION_ID_MAX_LEN
 
 _lock = asyncio.Lock()
-# Active runs only; entries removed in ``finally`` by the run tool wrapper.
-_tasks: dict[str, asyncio.Task[Any]] = {}
+# correlation_id -> Task once bound; None = reserved slot (task not yet registered)
+_registry: dict[str, asyncio.Task[Any] | None] = {}
+# Cancel while reserved (no task yet); honoured in ``bind_correlation_task``.
+_pending_cancel_before_bind: set[str] = set()
 
 
 def active_correlation_ids() -> frozenset[str]:
-    """Snapshot of ids currently registered (for tests / diagnostics)."""
-    return frozenset(_tasks.keys())
+    """Snapshot of ids currently reserved or bound (tests / diagnostics)."""
+    return frozenset(_registry.keys())
 
 
-async def register_run_task(correlation_id: str, task: asyncio.Task[Any]) -> str | None:
+async def reserve_correlation_slot(correlation_id: str) -> str | None:
     """
-    Register ``task`` under ``correlation_id``.
+    Reserve ``correlation_id`` before starting ``apex_run``.
 
-    Returns an error message if the id is already in use, else ``None``.
+    Returns an error string if the id is taken or too long; else ``None``.
     """
     if len(correlation_id) > MCP_CORRELATION_ID_MAX_LEN:
         return "correlation_id exceeds maximum length"
     async with _lock:
-        if correlation_id in _tasks:
+        if correlation_id in _registry:
             return "correlation_id already in use by an active run"
-        _tasks[correlation_id] = task
+        _registry[correlation_id] = None
     return None
 
 
-async def unregister_run_task(correlation_id: str) -> None:
+async def bind_correlation_task(correlation_id: str, task: asyncio.Task[Any]) -> None:
+    """Attach the running task; if cancel was requested during reservation, cancel immediately."""
     async with _lock:
-        _tasks.pop(correlation_id, None)
+        _registry[correlation_id] = task
+        if correlation_id in _pending_cancel_before_bind:
+            _pending_cancel_before_bind.discard(correlation_id)
+            task.cancel()
+
+
+async def unregister_correlation(correlation_id: str) -> None:
+    """Remove reservation or binding (``run`` tool ``finally``)."""
+    async with _lock:
+        _registry.pop(correlation_id, None)
+        _pending_cancel_before_bind.discard(correlation_id)
 
 
 async def cancel_run_by_correlation_id(correlation_id: str) -> dict[str, Any]:
@@ -49,14 +62,26 @@ async def cancel_run_by_correlation_id(correlation_id: str) -> dict[str, Any]:
     Response schema: ``apex.cancel_run/v1``.
     """
     async with _lock:
-        task = _tasks.get(correlation_id)
-    if task is None:
-        return {
-            "schema": "apex.cancel_run/v1",
-            "correlation_id": correlation_id,
-            "status": "not_found",
-            "detail": "No active run registered for this correlation_id.",
-        }
+        if correlation_id not in _registry:
+            return {
+                "schema": "apex.cancel_run/v1",
+                "correlation_id": correlation_id,
+                "status": "not_found",
+                "detail": "No active run registered for this correlation_id.",
+            }
+        entry = _registry[correlation_id]
+        if entry is None:
+            _pending_cancel_before_bind.add(correlation_id)
+            return {
+                "schema": "apex.cancel_run/v1",
+                "correlation_id": correlation_id,
+                "status": "cancel_requested",
+                "detail": (
+                    "Cancellation recorded; the run will be cancelled as soon as it starts "
+                    "(correlation slot was reserved)."
+                ),
+            }
+        task = entry
     task.cancel()
     return {
         "schema": "apex.cancel_run/v1",

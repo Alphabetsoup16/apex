@@ -46,6 +46,11 @@ def test_build_metadata_omits_detail_by_default(monkeypatch: pytest.MonkeyPatch)
     assert "error_detail" not in meta
 
 
+def test_sanitized_cancel_and_mcp_correlation_strings() -> None:
+    assert "cancel" in te.apex_sanitized_error(te.APEX_CANCELLED).lower()
+    assert "correlation" in te.apex_sanitized_error(te.APEX_MCP_CORRELATION).lower()
+
+
 def test_build_metadata_includes_detail_when_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APEX_EXPOSE_ERROR_DETAILS", "1")
     meta = te.build_top_level_error_metadata(RuntimeError("secret https://x/y"))

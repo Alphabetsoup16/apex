@@ -7,7 +7,7 @@ How to add or change stages in `text_mode` / `code_mode`.
 - **Step** — One unit of work (e.g. ensemble, CoT audit).
 - **Trace** — One object in `metadata.pipeline_steps[]` with `id`, `requirement`, `ok`, `duration_ms`, `detail`.
 - **`validate_pipeline_steps()`** — Non-throwing check; problems go to `metadata.telemetry.trace_validation.issues`.
-- **`required` / `optional`** — `required`: failure should abort or block per your rules; uncaught exceptions bubble. `optional`: swallow in `run_async_step`, record `ok: false`, continue unless you add verdict logic.
+- **`required` / `optional`** — `required`: failure should abort or block per your rules; uncaught exceptions bubble. `optional`: swallow in `run_async_step`, record `ok: false` with `detail.error_type` + fixed `message` (no raw exception string), continue unless you add verdict logic.
 
 ## Trace contract
 

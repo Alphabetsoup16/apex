@@ -60,7 +60,7 @@ If the run **crashes before** a normal pipeline result (e.g. bad config), you st
 
 | Key | Purpose |
 |-----|---------|
-| `error_code` | Stable: `apex.configuration`, `apex.validation`, `apex.network`, `apex.execution_backend`, `apex.internal`, `apex.capacity`, `apex.run_timeout`, … |
+| `error_code` | Stable: `apex.configuration`, `apex.validation`, `apex.network`, `apex.execution_backend`, `apex.internal`, `apex.capacity`, `apex.run_timeout`, `apex.cancelled`, `apex.mcp.correlation`, … |
 | `error` | **Sanitized** message for any client |
 | `error_type` | Exception class name (do not branch product logic on it) |
 | `error_detail` | Only if **`APEX_EXPOSE_ERROR_DETAILS`** is set — raw message, truncated ~8k |

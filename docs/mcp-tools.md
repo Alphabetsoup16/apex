@@ -44,7 +44,7 @@ Bounded reads under **`APEX_REPO_CONTEXT_ROOT`**: `repo_context_status`, `repo_r
 - **Schema:** `apex.cancel_run/v1`
 - **Arg:** `correlation_id` (non-empty; charset `a-zA-Z0-9._-`)
 - **Status:** `cancel_requested` | `not_found` | `invalid_id`
-- **Semantics:** cooperative cancel at next `await` inside `apex_run`; not a hard kill
+- **Semantics:** cooperative cancel at the next `await` inside `apex_run`. If the id is **reserved** (server accepted `correlation_id` but the task is not bound yet), cancel is queued and applied when the task starts — see [robustness.md](robustness.md#product-semantics-clients).
 
 ## `run`
 

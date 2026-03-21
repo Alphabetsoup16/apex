@@ -23,7 +23,8 @@
 - **`tests/eval/`** — Verdict + ordered `pipeline_steps` ids under fakes.
 - **`tests/test_observability.py`** — Trace contract, telemetry helpers.
 - **`tests/test_progress_events.py`** — Progress event schema + `run_async_step` hooks.
-- **`tests/test_mcp_input_guard.py`**, **`tests/test_mcp_run_registry.py`**, **`tests/test_mcp_diagnostics.py`** — MCP helpers (no FastMCP import).
+- **`tests/test_mcp_input_guard.py`**, **`tests/test_mcp_run_registry.py`** (reserve/bind cancel semantics), **`tests/test_mcp_diagnostics.py`** — MCP helpers (no FastMCP import).
+- **`tests/test_guard_metadata.py`** — Ensemble clamp + blocked metadata shape shared by MCP / ``apex_run``.
 - **`tests/test_mcp_server_wiring.py`** — With `mcp` installed (`pip install -e .`), asserts all expected tools are registered; otherwise **skipped**.
 - **`tests/test_ledger_read.py`** — `read_ledger_snapshot` API.
 - **`tests/test_resolve_run_modes.py`** — Shared mode resolution helper.

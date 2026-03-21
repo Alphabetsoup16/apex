@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import sqlite3
 import time
@@ -11,6 +12,8 @@ from typing import Any
 
 from apex.config.constants import LEDGER_QUERY_MAX_LIMIT
 from apex.models import ApexRunToolResult
+
+_LOG = logging.getLogger(__name__)
 
 LEDGER_QUERY_SCHEMA = "apex.ledger.query/v1"
 
@@ -248,6 +251,10 @@ async def record_apex_run_to_ledger_if_enabled(result: ApexRunToolResult) -> Non
         await asyncio.to_thread(_record_sync, cfg, result)
     except Exception:
         # Ledger must never break the primary verification result path.
+        _LOG.warning(
+            "ledger write failed (tool result unchanged)",
+            exc_info=True,
+        )
         return
 
 

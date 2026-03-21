@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import time
 from typing import Any, Literal
 
@@ -43,6 +44,8 @@ from apex.review.inspection import inspect_code_doc_only
 from apex.review.pack import build_pr_review_pack
 from apex.safety.cot_audit import audit_chain_of_thought
 from apex.scoring import DecisionSignals, code_convergence, decide_verdict, select_best_code
+
+_LOG = logging.getLogger(__name__)
 
 
 async def run_code_mode(
@@ -283,7 +286,13 @@ async def run_code_mode(
                     return None, None, None
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as exc:
+                    _LOG.warning(
+                        "execution backend suite %s raised %s",
+                        suite_idx,
+                        type(exc).__name__,
+                        exc_info=True,
+                    )
                     return False, None, None
 
             exec_tasks = [

@@ -69,10 +69,14 @@ class AnthropicMessagesClient:
                 return "".join(texts).strip()
             except asyncio.CancelledError:
                 raise
-            except Exception as e:  # pragma: no cover (network)
+            except httpx.HTTPError as e:  # pragma: no cover (network)
                 last_err = e
                 if isinstance(e, httpx.HTTPStatusError) and 400 <= e.response.status_code < 500:
                     break
+                if attempt < self._config.max_retries:
+                    await asyncio.sleep(0.5 * (2**attempt))
+            except (json.JSONDecodeError, TypeError, KeyError, ValueError) as e:  # pragma: no cover
+                last_err = e
                 if attempt < self._config.max_retries:
                     await asyncio.sleep(0.5 * (2**attempt))
         raise RuntimeError(f"Anthropic completion failed: {last_err}") from last_err
@@ -100,7 +104,7 @@ class AnthropicMessagesClient:
                 return json.loads(json_str)
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
+            except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
                 parse_err = e
                 user = (
                     user

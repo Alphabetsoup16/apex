@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -16,6 +17,8 @@ StepRequirement = Literal["required", "optional"]
 
 REQUIRED: StepRequirement = "required"
 OPTIONAL: StepRequirement = "optional"
+
+_LOG = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,7 +56,8 @@ async def run_async_step(
     - Put step-specific payloads in other keys (e.g. ``findings``).
 
     **required**: exceptions propagate (pipeline aborts upstream).
-    **optional**: exceptions become ``ok=False`` with ``detail.error``; no raise.
+    **optional**: exceptions become ``ok=False`` with ``detail.error_type`` only (no raw
+    ``str(exc)`` — avoids leaking provider text into traces / ledger detail).
     """
     rid = current_progress_run_id()
     if rid:
@@ -96,12 +100,21 @@ async def run_async_step(
             )
         if requirement == REQUIRED:
             raise
+        _LOG.debug(
+            "optional step %r failed: %s",
+            step_id,
+            type(e).__name__,
+            exc_info=True,
+        )
         return StepTrace(
             id=step_id,
             requirement=requirement,
             ok=False,
             duration_ms=ms,
-            detail={"error": f"{type(e).__name__}: {e}"},
+            detail={
+                "error_type": type(e).__name__,
+                "message": "optional_step_failed",
+            },
         )
 
 

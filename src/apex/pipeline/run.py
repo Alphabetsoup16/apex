@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
 import uuid
 from typing import Literal
 
-from apex.config.constants import ENSEMBLE_RUNS_MAX_EFFECTIVE, ENSEMBLE_RUNS_MIN_EFFECTIVE
 from apex.config.conventions import load_effective_conventions
 from apex.generation.ensemble import EnsembleConfig
 from apex.ledger import load_ledger_config, record_apex_run_to_ledger_if_enabled
@@ -27,6 +27,7 @@ from apex.observability.progress_events import (
     progress_run_scope,
 )
 from apex.pipeline.code_mode import run_code_mode
+from apex.pipeline.guard_metadata import blocked_run_base_metadata, clamp_ensemble_runs
 from apex.pipeline.helpers import infer_mode_from_prompt, temperatures_for_runs
 from apex.pipeline.observability import finalize_run_result
 from apex.pipeline.text_mode import run_text_mode
@@ -38,6 +39,8 @@ from apex.pipeline.top_level_errors import (
 )
 from apex.runtime.run_limits import load_run_limit_settings, run_concurrency_gate
 from apex.safety.run_input_limits import validate_run_inputs
+
+_LOG = logging.getLogger(__name__)
 
 
 def resolve_run_modes(
@@ -52,35 +55,6 @@ def resolve_run_modes(
     else:
         actual_mode = "text" if mode == "text" else "code"
     return actual_mode, inferred
-
-
-def _blocked_run_base_metadata(
-    *,
-    run_id: str,
-    actual_mode: Literal["text", "code"],
-    mode: Mode,
-    inferred: Literal["text", "code"],
-    ensemble_runs_requested: int,
-    ensemble_runs: int,
-    max_tokens: int,
-    output_mode: str,
-    code_ground_truth: bool,
-    timings_total_ms: int,
-) -> dict[str, object]:
-    """Shared keys for ``verdict=blocked`` results that never entered the pipeline."""
-    return {
-        "run_id": run_id,
-        "mode": actual_mode,
-        "mode_request": mode,
-        "mode_inferred": inferred if mode == "auto" else None,
-        "ensemble_runs_requested": ensemble_runs_requested,
-        "ensemble_runs_effective": ensemble_runs,
-        "max_tokens": max_tokens,
-        "output_mode": output_mode,
-        "ground_truth_enabled": code_ground_truth,
-        "pipeline_steps": [],
-        "timings_ms": {"total": timings_total_ms},
-    }
 
 
 def _annotate_ensemble_runs_metadata(
@@ -119,12 +93,7 @@ async def apex_run(
     inspection only (not token streaming; bounded at MCP boundary).
     """
     run_id = run_id or str(uuid.uuid4())
-    ensemble_runs_requested = ensemble_runs
-    ensemble_runs = (
-        ENSEMBLE_RUNS_MIN_EFFECTIVE
-        if ensemble_runs < ENSEMBLE_RUNS_MIN_EFFECTIVE
-        else min(ENSEMBLE_RUNS_MAX_EFFECTIVE, ensemble_runs)
-    )
+    ensemble_runs_requested, ensemble_runs = clamp_ensemble_runs(ensemble_runs)
     actual_mode, inferred = resolve_run_modes(prompt=prompt, mode=mode)
 
     bad_in = validate_run_inputs(
@@ -143,13 +112,13 @@ async def apex_run(
             adversarial_review=None,
             execution=None,
             metadata={
-                **_blocked_run_base_metadata(
+                **blocked_run_base_metadata(
                     run_id=run_id,
                     actual_mode=actual_mode,
                     mode=mode,
                     inferred=inferred,
                     ensemble_runs_requested=ensemble_runs_requested,
-                    ensemble_runs=ensemble_runs,
+                    ensemble_runs_effective=ensemble_runs,
                     max_tokens=max_tokens,
                     output_mode=output_mode,
                     code_ground_truth=code_ground_truth,
@@ -181,13 +150,13 @@ async def apex_run(
                 adversarial_review=None,
                 execution=None,
                 metadata={
-                    **_blocked_run_base_metadata(
+                    **blocked_run_base_metadata(
                         run_id=run_id,
                         actual_mode=actual_mode,
                         mode=mode,
                         inferred=inferred,
                         ensemble_runs_requested=ensemble_runs_requested,
-                        ensemble_runs=ensemble_runs,
+                        ensemble_runs_effective=ensemble_runs,
                         max_tokens=max_tokens,
                         output_mode=output_mode,
                         code_ground_truth=code_ground_truth,
@@ -288,6 +257,7 @@ async def apex_run(
             except asyncio.CancelledError:
                 raise
             except Exception as e:
+                _LOG.exception("apex_run: uncaught exception inside pipeline")
                 emit_progress(RUN_ERROR, error_type=type(e).__name__)
                 total_ms = int((time.perf_counter() - t_wall_start) * 1000)
                 err_meta = build_top_level_error_metadata(e)
@@ -297,13 +267,13 @@ async def apex_run(
                     adversarial_review=None,
                     execution=None,
                     metadata={
-                        **_blocked_run_base_metadata(
+                        **blocked_run_base_metadata(
                             run_id=run_id,
                             actual_mode=actual_mode,
                             mode=mode,
                             inferred=inferred,
                             ensemble_runs_requested=ensemble_runs_requested,
-                            ensemble_runs=ensemble_runs,
+                            ensemble_runs_effective=ensemble_runs,
                             max_tokens=max_tokens,
                             output_mode=output_mode,
                             code_ground_truth=code_ground_truth,
@@ -339,13 +309,13 @@ async def apex_run(
                     adversarial_review=None,
                     execution=None,
                     metadata={
-                        **_blocked_run_base_metadata(
+                        **blocked_run_base_metadata(
                             run_id=run_id,
                             actual_mode=actual_mode,
                             mode=mode,
                             inferred=inferred,
                             ensemble_runs_requested=ensemble_runs_requested,
-                            ensemble_runs=ensemble_runs,
+                            ensemble_runs_effective=ensemble_runs,
                             max_tokens=max_tokens,
                             output_mode=output_mode,
                             code_ground_truth=code_ground_truth,

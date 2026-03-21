@@ -18,6 +18,8 @@ APEX_EXECUTION_BACKEND = "apex.execution_backend"
 APEX_INTERNAL = "apex.internal"
 APEX_CAPACITY = "apex.capacity"
 APEX_RUN_TIMEOUT = "apex.run_timeout"
+APEX_CANCELLED = "apex.cancelled"
+APEX_MCP_CORRELATION = "apex.mcp.correlation"
 
 _SANITIZED: dict[str, str] = {
     APEX_CONFIGURATION: (
@@ -31,6 +33,8 @@ _SANITIZED: dict[str, str] = {
     APEX_INTERNAL: "An unexpected error occurred during the run.",
     APEX_CAPACITY: "Too many concurrent APEX runs; try again shortly.",
     APEX_RUN_TIMEOUT: "The run exceeded its maximum wall-clock time.",
+    APEX_CANCELLED: "The run was cancelled before completion.",
+    APEX_MCP_CORRELATION: "correlation_id is invalid or already in use by an active run.",
 }
 
 _MAX_DETAIL_CHARS = 8192

@@ -34,7 +34,9 @@ def test_optional_step_swallows_exception() -> None:
 
     trace = asyncio.run(run_async_step("s", OPTIONAL, work))
     assert trace.ok is False
-    assert "error" in trace.detail
+    assert trace.detail.get("error_type") == "ValueError"
+    assert trace.detail.get("message") == "optional_step_failed"
+    assert "flaky" not in str(trace.detail)
 
 
 def test_required_step_reraises() -> None:
