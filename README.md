@@ -1,89 +1,78 @@
 # APEX (Adversarial Pipeline for Execution eXamination)
 
-APEX is an MCP server that verifies LLM outputs using a layered pipeline:
+MCP server that checks LLM outputs with:
 
-- Ensemble generation (multi-path convergence)
-- Adversarial review (structured findings)
-- Optional executable ground truth for code (sandboxed backend; two independent pytest suites)
+- **Ensemble** generation and convergence
+- **Adversarial** review (structured findings)
+- **Code mode:** optional execution against your backend (two independent pytest suites)
 
-**Design focus:** APEX is tuned for the **light layer**—fast, diff-aware review amplification (ensemble + adversarial + inspection + optional small execution) so humans know *what to scrutinize*. Broader assurance—full test matrices, builds, SAST/DAST, dependency scanning, SonarQube, CodeQL, etc.—belongs in **CI** (e.g. GitHub Actions) on push/PR; APEX does not try to replace that pipeline.
+**Scope:** Fast, review-oriented signals (what to scrutinize)—not a replacement for full CI (matrices, SAST, dependency scans, etc.). Run those in your normal pipeline; use APEX at authoring/review time.
 
 ## Verdicts
 
-- `high_verified`: strong agreement + (when enabled) execution ground truth passed
-- `needs_review`: inconclusive or execution not enabled
-- `blocked`: extraction/validation failed, or safety/auditing blocked the run
+| Verdict | Meaning (short) |
+|---------|------------------|
+| `high_verified` | Strong convergence + no blocking findings + (code) execution passed when ground truth is on |
+| `needs_review` | Inconclusive, or execution off/unknown, or baseline downgrade |
+| `blocked` | Validation/safety/execution failure, or top-level run error |
 
 ## Quick Start
-
-Install:
 
 ```bash
 cd /path/to/apex
 pip install -e .
 ```
 
-Configure the LLM (Anthropic is the default provider). **Either** use the interactive wizard **or** set env vars (env wins if set):
+**LLM:** Interactive setup or env-only (non-empty env wins over file):
 
 ```bash
 apex init
-```
-
-**Or** with environment variables only:
-
-```bash
+# or
 export APEX_LLM_PROVIDER="anthropic"
 export ANTHROPIC_API_KEY="..."
 export ANTHROPIC_MODEL="claude-3-5-haiku-latest"
 ```
 
-**Models:** APEX runs **many** LLM calls per run (ensemble paths, adversarial review, inspection, test generation). Prefer **smaller, faster** Anthropic tiers (**Haiku** or **Sonnet**); **Opus** is usually slower, pricier, and rarely needed for this workflow. See [Configuration → model choice](docs/configuration.md#choosing-an-anthropic-model).
+APEX issues **many** LLM calls per tool run—prefer **Haiku** or **Sonnet** over **Opus** for cost/latency unless you deliberately need more capability. [Model notes](docs/configuration.md#picking-a-model).
 
-See [Configuration](docs/configuration.md) for `~/.apex/config.json`, overrides, and why GitHub Copilot is not a direct option.
+**Config file & Copilot:** [Configuration](docs/configuration.md) (`~/.apex/config.json`, overrides; Copilot is not a supported provider for this process).
 
-Run history (optional audit trail): default SQLite ledger at `~/.apex/ledger.sqlite3`; inspect with `apex ledger summary` (disable with `APEX_LEDGER_DISABLED=1`). Details in [Configuration - Run ledger](docs/configuration.md#run-ledger-sqlite).
+**Run ledger:** Each `apex_run` is logged to `~/.apex/ledger.sqlite3` by default. `apex ledger summary` to inspect; `APEX_LEDGER_DISABLED=1` to turn off. [Run ledger](docs/configuration.md#run-ledger-sqlite).
 
-Optional: enable executable verification for code mode:
+**Progress events (optional):** Set `APEX_PROGRESS_LOG=1` for structured JSON lines on logger `apex.progress` (run/pipeline/step boundaries—not LLM token streaming). [progress-events](docs/progress-events.md).
+
+**Code execution (optional):**
 
 ```bash
 export APEX_EXECUTION_BACKEND_URL="http://localhost:8080/execute"
 ```
 
-Execution backend details: see [Code execution backend contract](docs/code-execution.md).
+[Backend contract](docs/code-execution.md).
 
-Run APEX:
+**Start server:**
 
 ```bash
 python3 -m apex serve --transport stdio
 ```
 
-## Tool Interface
+## MCP tools
 
-APEX exposes `apex.run` with:
-- `prompt` (string)
-- `mode` (`auto` | `text` | `code`) — `auto` uses a small keyword heuristic; prefer an explicit mode when classification must be reliable
-- `code_ground_truth` (enables execution verification in `mode=code`)
-- `ensemble_runs` (clamped server-side to **2–3**), `max_tokens`
-- `known_good_baseline` (optional similarity downgrade for `high_verified`)
+Primary: **`run`** (verification). Operator helpers: **`health`**, **`describe_config`**, **`ledger_query`**, **`cancel_run`**, optional **`repo_*`** (allowlisted FS read/glob via `APEX_REPO_CONTEXT_ROOT`). See [mcp-tools.md](docs/mcp-tools.md) · [repo-context.md](docs/repo-context.md).
 
-See:
-- [Architecture](docs/architecture.md)
-- [Flow chart](docs/flow.md) (includes finalize + ledger before return)
-- [Pipeline steps (extending verification)](docs/pipeline-steps.md)
-- [Tool interface contract](docs/tool-interface.md)
-- [Verification semantics](docs/verification.md)
-- [Code execution backend contract](docs/code-execution.md)
-- [Safety & auditing](docs/safety.md)
-- [Configuration](docs/configuration.md)
+Main `run` inputs: `prompt`, `mode` (`auto` | `text` | `code`), `code_ground_truth`, `ensemble_runs` (clamped **2–3**), `max_tokens`, optional `known_good_baseline`, optional `supplementary_context` (code inspection only).
 
-## Limitations (Alpha)
+**Docs:**
 
-- `high_verified` in code mode requires `code_ground_truth=true` and a configured execution backend.
-- Doc-only inspection is best-effort; it does not replace running your real project test suite.
+- [Architecture](docs/architecture.md) · [Flow](docs/flow.md) · [Pipeline steps](docs/pipeline-steps.md)
+- [MCP tools](docs/mcp-tools.md) · [Tool contract](docs/tool-interface.md) · [Verification](docs/verification.md)
+- [Code execution](docs/code-execution.md) · [Safety](docs/safety.md) · [Configuration](docs/configuration.md)
+
+## Limitations (alpha)
+
+- `high_verified` in code mode needs `code_ground_truth=true` and a working backend.
+- Doc-only inspection does not replace your repo’s real test suite.
 
 ## Contributing
-
-Use a virtualenv, install the package and dev tools, then run checks:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -91,7 +80,4 @@ pip install -e ".[dev]"
 make check
 ```
 
-`Makefile` uses `python -m ruff` when available; otherwise it looks for `vendor/bin/ruff` (local vendoring — not in git).
-
-Regression-style checks for verdict + `pipeline_steps` order live under `tests/eval/` (deterministic mocks, no live LLM).
-
+Ruff: `python -m ruff` if installed, else `vendor/bin/ruff` (optional local copy). Eval-style regressions: `tests/eval/`.

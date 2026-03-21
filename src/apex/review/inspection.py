@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from apex.config.constants import MCP_MAX_SUPPLEMENTARY_CONTEXT_CHARS
 from apex.llm.interface import LLMClient
 from apex.models import AdversarialReview, CodeSolution
 
@@ -48,6 +49,7 @@ async def inspect_code_doc_only(
     language: str | None = None,
     diff: str | None = None,
     repo_conventions: str | None = None,
+    supplementary_context: str | None = None,
 ) -> AdversarialReview:
     solution_files = "\n".join([f"--- {f.path} ---\n{f.content}" for f in candidate.files])
 
@@ -75,6 +77,14 @@ async def inspect_code_doc_only(
 
     tests_info = _truncate(tests_info, max_chars=12000)
 
+    supp = ""
+    if supplementary_context:
+        supp = (
+            f"Supplementary context (operator-provided, may include repo notes or static "
+            f"snippets — not live index/RAG):\n"
+            f"{_truncate(supplementary_context, max_chars=MCP_MAX_SUPPLEMENTARY_CONTEXT_CHARS)}\n\n"
+        )
+
     user = (
         (f"Language:\n{language}\n\n" if language else "")
         + (
@@ -82,6 +92,7 @@ async def inspect_code_doc_only(
             if repo_conventions
             else ""
         )
+        + supp
         + f"Task requirements:\n{task_prompt}\n\n"
         + f"Candidate code (may be truncated):\n{solution_files}"
         f"{tests_info}"

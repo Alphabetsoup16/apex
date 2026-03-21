@@ -61,6 +61,7 @@ async def run_code_mode(
     diff: str | None,
     repo_conventions: str | None,
     output_mode: str,
+    supplementary_context: str | None = None,
 ) -> ApexRunToolResult:
     findings_policy = load_findings_policy()
     extraction_ok = True
@@ -371,6 +372,7 @@ async def run_code_mode(
                 language=language,
                 diff=diff,
                 repo_conventions=repo_conventions,
+                supplementary_context=supplementary_context,
             )
             return review, int((time.perf_counter() - t_ins_start) * 1000)
         except asyncio.CancelledError:

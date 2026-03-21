@@ -1,51 +1,72 @@
-# Tool Interface Contract (`apex.run`)
+# Tool interface (MCP)
 
-APEX exposes a single MCP tool: `apex.run`.
+The MCP server exposes **`run`** plus small **operator** tools (`health`, `describe_config`, `ledger_query`, `cancel_run`). Full tool list and schemas: [mcp-tools.md](mcp-tools.md).
 
-## Inputs
+Inputs to **`run`** are validated by FastMCP / Pydantic; outputs are JSON-serializable. String **size / NUL** bounds are enforced inside **`apex_run`** via `apex.safety.run_input_limits` (same rules for MCP and embedders).
 
-- `prompt` (string)
-- `mode` (`auto` | `text` | `code`, default: `auto`)
-  - `auto` infers `text` vs `code` from a **small keyword heuristic** on the prompt. It can misclassify unusual prompts; use an explicit `mode` when the outcome must be deterministic.
-- `code_ground_truth` (boolean, default: `false`)
-  - only applies when `mode=code`
-- `ensemble_runs` (int, default: `3`)
-  - **Clamped** server-side to the inclusive range **2–3** (see `ENSEMBLE_RUNS_MIN_EFFECTIVE` / `ENSEMBLE_RUNS_MAX_EFFECTIVE` in `apex.config.constants`). Metadata includes `ensemble_runs_requested` and `ensemble_runs_effective` on successful runs; top-level failure metadata includes the same fields.
-- `max_tokens` (int, default: `1024`)
-- `known_good_baseline` (string | null, optional)
-  - if provided, APEX can downgrade `high_verified` when output divergence is large
-- `language` (string | null, optional)
-- `diff` (string | null, optional)
-- `repo_conventions` (string | null, optional)
-- `output_mode` (string, default: `candidate`)
-  - `candidate`: return the best candidate output (current default behavior)
-  - `review_pack`: return a PR review pack synthesized from findings
+## `run` — inputs
 
-## Output fields
+| Field | Type / default | Notes |
+|-------|------------------|--------|
+| `prompt` | string | Required |
+| `mode` | `auto` \| `text` \| `code` — default `auto` | `auto` uses a small keyword heuristic; use explicit `mode` when classification must be reliable |
+| `code_ground_truth` | bool, default `false` | Only in `mode=code`; enables backend execution |
+| `ensemble_runs` | int, default `3` | **Clamped to 2–3** (`ENSEMBLE_RUNS_*` in `apex.config.constants`). Metadata exposes `ensemble_runs_requested` vs `ensemble_runs_effective` |
+| `max_tokens` | int, default `1024` | |
+| `known_good_baseline` | string \| null | Optional; can downgrade `high_verified` if similarity to output is low (see [verification.md](verification.md)) |
+| `language`, `diff`, `repo_conventions` | string \| null | Optional context |
+| `output_mode` | string, default `candidate` | `candidate` = best output string; `review_pack` = synthesized review text |
+| `correlation_id` | string \| null | Optional; register this invocation for `cancel_run` (charset: `a-zA-Z0-9._-`) |
+| `supplementary_context` | string \| null | Optional; **code mode** doc inspection only — static snippets / notes from the operator (not live RAG) |
 
-The tool returns JSON shaped like:
+## `run` — outputs
 
-- `verdict`: `high_verified` | `needs_review` | `blocked`
-- `output`: string (best candidate answer, or concatenated code bundle)
-- `metadata`: object (structured run metadata)
-- `adversarial_review`: object | `null` (post–findings-policy view; **`high` / `medium` are never removed** by policy — see [configuration.md](configuration.md))
-- `execution`: object | `null` (code-mode execution result, when available)
+| Field | Content |
+|-------|---------|
+| `verdict` | `high_verified` \| `needs_review` \| `blocked` |
+| `output` | Answer string or formatted code bundle (or review pack) |
+| `metadata` | Structured run data (below) |
+| `adversarial_review` | Object or `null`; **policy never drops `high`/`medium`** ([configuration.md](configuration.md)) |
+| `execution` | Object or `null` (code mode + backend) |
 
-### Metadata notes
+### `metadata` — common fields
 
-- **`telemetry`** (`schema`: `apex.telemetry/v1`), added by `finalize_run_result`:
-  - **`trace_id`**, **`root_span_id`**: correlation / exporter-friendly IDs.
-  - **`run_wall_ms`**: from **`timings_ms.total`** when it is a numeric **`int`** or **`float`** (rounded); otherwise **`null`**.
-  - **`spans[]`**: one synthetic span per **`pipeline_steps`** row (`name` = step `id`, plus duration, `ok`, `detail`).
-  - **`trace_validation`**: always present — `{ "ok": bool, "issues": string[] }`. Non-empty **`issues`** means the step list failed contract checks (see [pipeline-steps.md](pipeline-steps.md#trace-contract-validated)); the run still returns normally so operators can alert on **`telemetry.trace_validation.ok`**.
-- **`uncertainty`** (`schema`: `apex.uncertainty/v1`): `convergence`, `convergence_band` (`strong` / `moderate` / `weak` / `unknown`), `ensemble_divergence_hint` (roughly `1 - convergence` when known), adversarial + code-inspection summaries, and **`execution_surface`** for code + ground-truth runs.
-- `ensemble_runs_requested` / `ensemble_runs_effective`: tool input vs value used after clamping (successful runs).
-- If the run aborts inside `apex_run` before a mode-specific pipeline result is returned (e.g. missing LLM config), `verdict` is `blocked` and metadata includes `error_type`, full `error` string, `mode`, `mode_request`, `mode_inferred` (when `mode=auto`), `timings_ms.total` (wall time including client setup), and an empty `pipeline_steps` list.
-- `metadata.pipeline_steps`: ordered traces for pipeline stages (see [pipeline-steps.md](pipeline-steps.md)); includes `ensemble`, `cot_audit`, and mode-specific follow-on steps (or explicit skip rows for optional stages).
-- If `known_good_baseline` is provided, `metadata.baseline_similarity` may be included.
-- If chain-of-thought leakage is detected, the run is `blocked` and `metadata.cot_audit` is included.
+- **`pipeline_steps`** — Ordered traces: `id`, `requirement`, `ok`, `duration_ms`, `detail`. Spec: [pipeline-steps.md](pipeline-steps.md).
+- **`ensemble_runs_requested` / `ensemble_runs_effective`** — Request vs clamped value.
+- **`baseline_similarity`** — Set when `known_good_baseline` was provided.
+- **`cot_audit`** — Present when CoT leakage blocked the run.
+- **`input_validation`** — `true` when the run was blocked by input limit checks (oversize / NUL).
+- **`mcp_correlation_rejected`** — `true` when `correlation_id` was already in use.
+- **`cancelled`** — `true` when the in-flight task was cooperatively cancelled.
 
-### Side effects (not in the JSON body)
+### `metadata.telemetry` (`apex.telemetry/v1`)
 
-- **Run ledger**: by default, each completed `apex_run` appends an audit row to **`~/.apex/ledger.sqlite3`** (SQLite). This does not change the tool response shape; turn off with **`APEX_LEDGER_DISABLED=1`** or override **`APEX_LEDGER_PATH`**. See [configuration.md](configuration.md#run-ledger-sqlite); inspect with **`apex ledger summary`**.
+Added in `finalize_run_result`:
 
+- **`trace_id` / `root_span_id`** — Correlation IDs
+- **`run_wall_ms`** — From `timings_ms.total` if numeric; else `null`
+- **`spans[]`** — One synthetic span per `pipeline_steps` row
+- **`trace_validation`** — `{ "ok": bool, "issues": string[] }`; non-empty `issues` means the step list broke the contract (run still returns 200—use for alerts)
+
+### `metadata.uncertainty` (`apex.uncertainty/v1`)
+
+Derived signals: `convergence`, `convergence_band`, `ensemble_divergence_hint`, adversarial/inspection summaries, `execution_surface` (code + ground truth).
+
+### Top-level `apex_run` failure (guard path)
+
+If the run **crashes before** a normal pipeline result (e.g. bad config), you still get `verdict: blocked` and:
+
+| Key | Purpose |
+|-----|---------|
+| `error_code` | Stable: `apex.configuration`, `apex.validation`, `apex.network`, `apex.execution_backend`, `apex.internal`, … |
+| `error` | **Sanitized** message for any client |
+| `error_type` | Exception class name (do not branch product logic on it) |
+| `error_detail` | Only if **`APEX_EXPOSE_ERROR_DETAILS`** is set — raw message, truncated ~8k |
+
+Also: `mode`, `mode_request`, `mode_inferred` (if `auto`), `timings_ms.total`, **`pipeline_steps`: []**.
+
+**Pipeline `blocked` vs guard `blocked`:** Failures **inside** text/code mode (e.g. bundle validation) often return `blocked` with a **stage-specific** `metadata.error` string. Only the **guard** path above guarantees `error_code` + sanitized `error`. [configuration.md#top-level-errors-sanitized-by-default](configuration.md#top-level-errors-sanitized-by-default).
+
+### Side effect: run ledger
+
+By default, completed runs append to **`~/.apex/ledger.sqlite3`**. Does not change JSON shape. **`APEX_LEDGER_DISABLED=1`** or **`APEX_LEDGER_PATH`**: [configuration.md#run-ledger-sqlite](configuration.md#run-ledger-sqlite). **`apex ledger summary`** · **`apex ledger query`**.

@@ -5,6 +5,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from apex.observability.progress_events import (
+    STEP_END,
+    STEP_START,
+    current_progress_run_id,
+    emit_progress,
+)
+
 StepRequirement = Literal["required", "optional"]
 
 REQUIRED: StepRequirement = "required"
@@ -48,21 +55,45 @@ async def run_async_step(
     **required**: exceptions propagate (pipeline aborts upstream).
     **optional**: exceptions become ``ok=False`` with ``detail.error``; no raise.
     """
+    rid = current_progress_run_id()
+    if rid:
+        emit_progress(STEP_START, step_id=step_id, requirement=requirement, run_id=rid)
+
     t0 = time.perf_counter()
     try:
         result = await work()
         ms = int((time.perf_counter() - t0) * 1000)
         ok = bool(result.get("ok", True))
         detail = {k: v for k, v in result.items() if k != "ok"}
-        return StepTrace(
+        trace = StepTrace(
             id=step_id,
             requirement=requirement,
             ok=ok,
             duration_ms=ms,
             detail=detail,
         )
+        if rid:
+            emit_progress(
+                STEP_END,
+                step_id=step_id,
+                requirement=requirement,
+                ok=trace.ok,
+                duration_ms=trace.duration_ms,
+                run_id=rid,
+            )
+        return trace
     except Exception as e:
         ms = int((time.perf_counter() - t0) * 1000)
+        if rid:
+            emit_progress(
+                STEP_END,
+                step_id=step_id,
+                requirement=requirement,
+                ok=False,
+                duration_ms=ms,
+                run_id=rid,
+                error_type=type(e).__name__,
+            )
         if requirement == REQUIRED:
             raise
         return StepTrace(

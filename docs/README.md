@@ -1,18 +1,29 @@
-# Documentation
+# Documentation index
 
-- [Architecture](architecture.md)
-- [Flow chart](flow.md)
-- [Pipeline steps (adding stages)](pipeline-steps.md)
-- [Tool interface contract](tool-interface.md)
-- [Verification semantics](verification.md)
-- [Code execution backend contract](code-execution.md)
-- [Safety & auditing](safety.md)
-- [Configuration](configuration.md#run-ledger-sqlite) (includes **Run ledger**: SQLite at `~/.apex/ledger.sqlite3`, **`apex ledger summary`**)
+| Doc | What it covers |
+|-----|----------------|
+| [architecture.md](architecture.md) | Package layout, entrypoints, how pieces fit |
+| [flow.md](flow.md) | Mermaid flow; read `metadata.pipeline_steps` for exact order |
+| [pipeline-steps.md](pipeline-steps.md) | Adding stages, trace contract, observability |
+| [progress-events.md](progress-events.md) | Optional `APEX_PROGRESS_LOG` JSON progress (not token streaming) |
+| [tool-interface.md](tool-interface.md) | MCP `run` inputs/outputs, metadata fields |
+| [mcp-tools.md](mcp-tools.md) | All MCP tools (`health`, ledger query, cancel, …) |
+| [robustness.md](robustness.md) | Guarantees vs best-effort; invariants for contributors |
+| [repo-context.md](repo-context.md) | Opt-in MCP repo read/glob (no RAG) |
+| [verification.md](verification.md) | Verdict rules, baseline downgrade |
+| [code-execution.md](code-execution.md) | Execution backend HTTP contract |
+| [safety.md](safety.md) | Redaction, CoT audit, ledger on disk |
+| [configuration.md](configuration.md) | Env vars, config file, ledger, errors |
 
-## Tests vs docs
+## Where tests live
 
-- Behavioral tests: `tests/` (patch at the import site used by the module under test; see [architecture.md](architecture.md)).
-- Declarative pipeline regressions: `tests/eval/` (verdict + ordered `pipeline_steps` ids).
-- Trace contract + telemetry helpers: `tests/test_observability.py` (e.g. `validate_pipeline_steps`, `run_wall_ms` from `timings_ms.total`).
-- Run ledger: `tests/test_ledger.py`; `tests/conftest.py` sets `APEX_LEDGER_DISABLED=1` so the suite does not write `~/.apex/ledger.sqlite3` unless a test clears it.
-
+- **`tests/`** — Unit/integration; patch the module under test (see [architecture.md](architecture.md)).
+- **`tests/eval/`** — Verdict + ordered `pipeline_steps` ids under fakes.
+- **`tests/test_observability.py`** — Trace contract, telemetry helpers.
+- **`tests/test_progress_events.py`** — Progress event schema + `run_async_step` hooks.
+- **`tests/test_mcp_input_guard.py`**, **`tests/test_mcp_run_registry.py`**, **`tests/test_mcp_diagnostics.py`** — MCP helpers (no FastMCP import).
+- **`tests/test_mcp_server_wiring.py`** — With `mcp` installed (`pip install -e .`), asserts all expected tools are registered; otherwise **skipped**.
+- **`tests/test_ledger_read.py`** — `read_ledger_snapshot` API.
+- **`tests/test_resolve_run_modes.py`** — Shared mode resolution helper.
+- **`tests/test_ledger.py`** — SQLite ledger; **`tests/conftest.py`** sets `APEX_LEDGER_DISABLED=1` so the default DB is not written unless a test clears it.
+- **`tests/test_top_level_errors.py`** — `error_code` / `APEX_EXPOSE_ERROR_DETAILS` (with cases in `test_pipeline_run.py`).

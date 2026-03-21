@@ -1,6 +1,6 @@
-# APEX Flow
+# Flow
 
-High-level behavior matches this chart. For **exact** stage names and order (including traced skips), use `metadata.pipeline_steps` and [pipeline-steps.md](pipeline-steps.md).
+The diagram is a **map**, not the spec. Exact stage **names and order** (including skipped optional steps) are in **`metadata.pipeline_steps`** — see [pipeline-steps.md](pipeline-steps.md).
 
 ```mermaid
 flowchart TD
@@ -42,8 +42,10 @@ flowchart TD
   C17 --> OUTA
 
   OUTA --> FIN["finalize_run_result: validate pipeline_steps + telemetry + uncertainty"]
-  FIN --> LED["SQLite run ledger append (default ~/.apex/ledger.sqlite3; opt-out APEX_LEDGER_DISABLED)"]
+  FIN --> LED["SQLite ledger append (default ~/.apex/ledger.sqlite3 unless APEX_LEDGER_DISABLED)"]
   LED --> RET["Return apex.run JSON to client"]
 ```
 
-Chart matches current `text_mode` / `code_mode`. **`ensemble_runs`** is clamped to 2–3 (see `apex.config.constants`). With `code_ground_truth` off, execution stages are **skipped** but still appear as explicit rows in `metadata.pipeline_steps`. After the mode pipeline, every result goes through **`finalize_run_result`** (**`metadata.telemetry`** + **`metadata.uncertainty`**), then a **SQLite ledger** append (**on by default** at **`~/.apex/ledger.sqlite3`**; opt-out **`APEX_LEDGER_DISABLED=1`** — see [pipeline-steps.md](pipeline-steps.md#observability-automatic) and [configuration.md](configuration.md#run-ledger-sqlite)). Inspect locally with **`apex ledger summary`**.
+**Clamps:** `ensemble_runs` is **2–3** (`apex.config.constants`). **Code + no ground truth:** execution is skipped but still traced in `pipeline_steps`.
+
+**After the chart:** `finalize_run_result` always runs → **`telemetry`** + **`uncertainty`**. Then the **ledger** may write (default path; disable with `APEX_LEDGER_DISABLED=1`). See [pipeline-steps.md#observability-automatic](pipeline-steps.md#observability-automatic), [configuration.md#run-ledger-sqlite](configuration.md#run-ledger-sqlite). **`apex ledger summary`** reads the DB.

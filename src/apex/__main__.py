@@ -26,9 +26,21 @@ def _build_parser() -> argparse.ArgumentParser:
         "action",
         nargs="?",
         default="summary",
-        choices=["summary"],
+        choices=["summary", "query"],
         metavar="ACTION",
-        help="summary: counts, verdict breakdown, recent runs (default).",
+        help="summary: human text (default). query: JSON snapshot (same as MCP ledger_query).",
+    )
+    ledger_p.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        help="For query: max recent runs (clamped).",
+    )
+    ledger_p.add_argument(
+        "--run-id",
+        dest="run_id",
+        default=None,
+        help="For query: fetch one run and its pipeline_steps.",
     )
 
     return parser
@@ -70,6 +82,8 @@ def main(argv: list[str] | None = None) -> None:
 
         if args.action == "summary":
             ledger_cmd.cmd_ledger_summary()
+        elif args.action == "query":
+            ledger_cmd.cmd_ledger_query(limit=args.limit, run_id=args.run_id)
 
 
 if __name__ == "__main__":

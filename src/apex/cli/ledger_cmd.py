@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 import textwrap
 from typing import TextIO
 
-from apex.ledger import default_ledger_path, resolve_ledger_db_path
+from apex.ledger import (
+    default_ledger_path,
+    read_ledger_snapshot,
+    resolve_ledger_db_path,
+)
 
 
 def _out(msg: str = "", *, file: TextIO | None = None) -> None:
@@ -87,3 +92,9 @@ def cmd_ledger_summary() -> None:
         for run_id, created_at, verdict, mode in recent:
             lines.append(f"  {created_at}  {verdict:14}  mode={mode!s}  {run_id}")
     _out("\n".join(lines))
+
+
+def cmd_ledger_query(*, limit: int, run_id: str | None) -> None:
+    """Emit JSON ledger snapshot (same shape as MCP ``ledger_query``)."""
+    snap = read_ledger_snapshot(limit=limit, run_id=run_id)
+    _out(json.dumps(snap, indent=2, sort_keys=True, default=str))

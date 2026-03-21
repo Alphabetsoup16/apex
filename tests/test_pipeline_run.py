@@ -556,7 +556,46 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
     assert result.adversarial_review is None
     assert result.execution is None
     assert result.metadata["mode"] == "code"
+    # In-pipeline block (``blocked_run_result``) still carries the concrete validation token.
     assert "missing_test_solution_py" in result.metadata.get("error", "")
+
+
+def test_apex_run_top_level_value_error_uses_sanitized_metadata(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", lambda: _FakeClient("fake-text"))
+
+    def boom(**kwargs):
+        raise ValueError("missing_test_solution_py")
+
+    monkeypatch.setattr(pipeline_run, "load_effective_conventions", boom)
+    monkeypatch.delenv("APEX_EXPOSE_ERROR_DETAILS", raising=False)
+
+    result = asyncio.run(
+        pipeline_run.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=False,
+        )
+    )
+    assert result.verdict == "blocked"
+    md = result.metadata
+    assert md.get("error_code") == "apex.validation"
+    assert "Validation failed" in md.get("error", "")
+    assert "missing_test_solution_py" not in md.get("error", "")
+    assert "error_detail" not in md
+
+    monkeypatch.setenv("APEX_EXPOSE_ERROR_DETAILS", "1")
+    result2 = asyncio.run(
+        pipeline_run.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=False,
+        )
+    )
+    assert "missing_test_solution_py" in result2.metadata.get("error_detail", "")
 
 
 def test_apex_run_code_ground_truth_false_never_high_verified(
@@ -834,6 +873,7 @@ def test_apex_run_top_level_exception_has_rich_metadata(monkeypatch: pytest.Monk
         raise RuntimeError(long_msg)
 
     monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", boom)
+    monkeypatch.delenv("APEX_EXPOSE_ERROR_DETAILS", raising=False)
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -852,10 +892,37 @@ def test_apex_run_top_level_exception_has_rich_metadata(monkeypatch: pytest.Monk
     assert md["mode_request"] == "text"
     assert md["mode_inferred"] is None
     assert md["mode"] == "text"
+    assert md["error_code"] == "apex.internal"
     assert md["error_type"] == "RuntimeError"
-    assert md["error"] == long_msg
+    assert md["error"] != long_msg
+    assert long_msg not in md["error"]
+    assert "error_detail" not in md
     assert md["pipeline_steps"] == []
     assert "total" in md["timings_ms"]
+
+
+def test_apex_run_top_level_exception_includes_error_detail_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    long_msg = "e" * 2500
+
+    def boom() -> None:
+        raise RuntimeError(long_msg)
+
+    monkeypatch.setattr(pipeline_run, "load_llm_client_from_env", boom)
+    monkeypatch.setenv("APEX_EXPOSE_ERROR_DETAILS", "1")
+
+    result = asyncio.run(
+        pipeline_run.apex_run(
+            prompt="hello",
+            mode="text",
+            ensemble_runs=3,
+            max_tokens=512,
+            code_ground_truth=False,
+        )
+    )
+    md = result.metadata
+    assert md["error_detail"] == long_msg
 
 
 def test_apex_run_success_includes_ensemble_request_metadata(monkeypatch: pytest.MonkeyPatch):

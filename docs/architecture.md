@@ -1,52 +1,43 @@
 # Architecture
 
-APEX is organized around a **light verification layer** (fast feedback while authoring/reviewing) and **optional** sandbox execution for code. Heavy CI stays outside this repo’s scope.
+APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **scoring**, and **MCP** so each layer is testable without loading the server.
 
-## Package layout (`src/apex/`)
+## `src/apex/` layout
 
-| Area | Location | Responsibility |
-|------|-----------|----------------|
-| MCP entry | `apex.mcp.server` | FastMCP tool wiring (`create_mcp_server`) |
-| CLI | `apex.__main__` | `apex serve`, `apex init|setup` (+ optional `show`/`clear`), `apex ledger summary` |
-| Pipeline | `apex.pipeline.*` | `apex_run` router, text/code flows, `step_support`, `steps_catalog`, `trace_contract`, `observability` |
-| Ledger | `apex.ledger` | SQLite run audit trail after `finalize_run_result` (default `~/.apex/ledger.sqlite3`; opt-out `APEX_LEDGER_DISABLED=1`) |
-| Models | `apex.models` | Pydantic schemas (tool I/O, findings, code bundles) |
-| Config | `apex.config.*` | Thresholds (`constants`), conventions merge (`conventions`), findings policy (`policy`) |
-| Generation | `apex.generation.*` | Ensemble prompts + variant generation |
-| Review | `apex.review.*` | Adversarial pass, doc-only inspection, PR review pack |
-| Scoring | `apex.scoring` | Convergence, selection, verdict policy |
-| LLM | `apex.llm.*` | `interface` (protocol), `loader`, `providers/*` |
-| Safety | `apex.safety.*` | Redaction, JSON extraction, CoT heuristics |
-| Execution (optional) | `apex.code_ground_truth.*` | Backend client + JSON contract |
+| Area | Module | Role |
+|------|--------|------|
+| MCP | `apex.mcp.server` | FastMCP: `run`, `health`, `describe_config`, `ledger_query`, `cancel_run`, optional `repo_*` ([mcp-tools.md](mcp-tools.md)) |
+| Repo context | `apex.repo_context` | Allowlisted read/glob (env-gated); [repo-context.md](repo-context.md) |
+| CLI | `apex.__main__` | `serve`, `init`/`setup`, `ledger summary` |
+| Pipeline | `apex.pipeline.*` | `apex_run`, text/code modes, steps, traces, `finalize_run_result`, top-level error shaping |
+| Observability | `apex.observability.progress_events` | Optional `APEX_PROGRESS_LOG` JSON lines (`apex.progress` logger); step hooks via `run_async_step` |
+| Ledger | `apex.ledger` | SQLite append after finalize (default `~/.apex/ledger.sqlite3`; `APEX_LEDGER_DISABLED=1` off) |
+| Models | `apex.models` | Pydantic tool I/O |
+| Config | `apex.config.*` | Constants, conventions merge, findings policy |
+| Generation / Review / Scoring | `apex.generation`, `apex.review`, `apex.scoring` | Used by pipeline, not MCP directly |
+| LLM | `apex.llm.*` | Client protocol, loader, Anthropic provider |
+| Safety | `apex.safety.*` | Redaction, JSON extract, CoT heuristics |
+| Execution | `apex.code_ground_truth.*` | Optional backend client + contract |
 
-## Public entrypoints
+## Entrypoints
 
-- **`apex.pipeline.run.apex_run`**: MCP / CLI entry.
-- **`apex.pipeline.helpers`**: `validate_code_bundles`, `infer_mode_from_prompt`, etc.
-- **`apex.pipeline`**: re-exports `apex_run` from `apex.pipeline.run`.
+- **`apex.pipeline.run.apex_run`** — What `apex.run` calls.
+- **`apex.pipeline.helpers`** — Shared helpers (`validate_code_bundles`, mode heuristic, etc.).
 
-## Why this shape
+## Pipeline shape
 
-- **Pipeline** stays orchestration-only; **generation** / **review** / **scoring** are independently testable.
-- **Config** is grouped so env/file policy does not sprawl across the tree.
-- **MCP** is isolated from core logic so the server surface is one import.
+1. **Catalog** (`steps_catalog`) — Documents step ids and intent.
+2. **Implementation** (`text_mode` / `code_mode`) — Authoritative order; use `run_async_step` / `skipped_step_record` from `step_support`.
+3. **After each result** — `finalize_run_result` adds `metadata.telemetry` + `metadata.uncertainty` and validates `pipeline_steps`. Then the ledger may write SQLite.
 
-## Pipeline steps
+Details: [pipeline-steps.md](pipeline-steps.md).
 
-- **Catalog**: `apex.pipeline.steps_catalog` — human-readable `PipelineStepSpec` rows per mode (`required` vs `optional`).
-- **Runner**: `apex.pipeline.step_support.run_async_step` — standard timing, `ok` convention, optional-step exception swallowing.
-- **Guide**: [pipeline-steps.md](pipeline-steps.md).
-
-Successful runs attach `metadata.pipeline_steps` with trace objects for each logical stage (ensemble, CoT audit, reviews, optional skips, etc.); see `docs/pipeline-steps.md`.
-
-- **Observability**: `apex.pipeline.observability.finalize_run_result` validates `pipeline_steps` shape and attaches **`metadata.telemetry`** (`apex.telemetry/v1`) and **`metadata.uncertainty`** (`apex.uncertainty/v1`) on every tool result from `apex_run`.
-- **Ledger**: `apex.ledger.record_apex_run_to_ledger_if_enabled` appends to local SQLite (default path above) unless disabled; see **`apex ledger summary`**.
+Guarantees vs best-effort: [robustness.md](robustness.md).
 
 ## Tests
 
-- **Unit / integration (mocked LLM):** patch the module where a name is bound (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a different import path for the same symbol.
-- **Eval / regressions:** `tests/eval/` — parametrized cases asserting `verdict` and `metadata.pipeline_steps` order under deterministic fakes.
+Patch **where the name is used** (e.g. `apex.pipeline.text_mode.generate_text_variants`), not a re-export of the same symbol elsewhere. Eval cases: `tests/eval/`.
 
-## Related docs
+## Diagram
 
-- [flow.md](flow.md) — high-level Mermaid chart (authoritative detail: `pipeline_steps` + [pipeline-steps.md](pipeline-steps.md)).
+[flow.md](flow.md) — Chart is a guide; **`metadata.pipeline_steps`** is the source of truth for order and skips.

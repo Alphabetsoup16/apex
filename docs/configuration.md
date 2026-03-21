@@ -1,49 +1,49 @@
 # Configuration
 
-APEX uses environment variables for configuration.
+Most behavior is controlled with **environment variables**. File-based LLM config is optional; see below.
 
-## LLM Provider
+## LLM (Anthropic)
 
-Currently, only Anthropic is implemented.
+Only Anthropic is implemented today.
 
-### Local wizard (easiest for dev machines)
-
-After `pip install -e .`:
+### Wizard
 
 ```bash
-apex init              # interactive: API key (hidden), model, base URL → ~/.apex/config.json
-apex init show         # file + env summary (no secrets)
-apex init clear        # remove ~/.apex/config.json
-apex setup             # same as `apex init` (alias)
+apex init              # writes ~/.apex/config.json (key hidden)
+apex init show         # file + env summary, no secrets printed
+apex init clear        # delete config file
+apex setup             # alias for apex init
 ```
 
-- **GitHub Copilot** is **not** a selectable provider: it is tied to your editor session and does not expose a supported API for a separate MCP server process. Use Anthropic (or set env vars to hit an OpenAI-compatible proxy you control).
+**Copilot:** Not supported as a provider here—the MCP server runs outside the editor; use Anthropic or an HTTP API you control.
 
-### Environment variables (override file when set)
+### Env vs file
 
-Highest precedence: if a variable is **non-empty**, it wins over `~/.apex/config.json`.
+If an env var is **non-empty**, it overrides `~/.apex/config.json` (or `APEX_USER_CONFIG_PATH`).
 
-- `APEX_USER_CONFIG_PATH` — optional path to the JSON file instead of `~/.apex/config.json` (tests, advanced layouts)
-- `APEX_LLM_PROVIDER` (default: `anthropic`)
-- `ANTHROPIC_API_KEY`
-- `ANTHROPIC_MODEL`
-- `ANTHROPIC_BASE_URL` (optional; default: `https://api.anthropic.com`)
+| Variable | Role |
+|----------|------|
+| `APEX_USER_CONFIG_PATH` | Alternate JSON path (tests, custom layout) |
+| `APEX_LLM_PROVIDER` | Default `anthropic` |
+| `ANTHROPIC_API_KEY` | Required for calls |
+| `ANTHROPIC_MODEL` | Model id |
+| `ANTHROPIC_BASE_URL` | Default `https://api.anthropic.com` |
 
-### Choosing an Anthropic model
+### Picking a model
 
-APEX is **call-heavy**: multiple ensemble generations, adversarial review, doc inspection (code), optional test suites, etc. Cost and latency scale with **per-call** pricing and parallelism.
+One APEX tool run triggers **many** calls (ensemble, reviews, tests in code mode). Cost and latency scale with per-call pricing.
 
-| Tier | When to use |
-|------|----------------|
-| **Haiku** (e.g. `claude-3-5-haiku-latest` or current Haiku id from [Anthropic docs](https://docs.anthropic.com/en/docs/about-claude/models)) | **Default recommendation** for everyday use: lower cost and latency; often enough for structured JSON + review passes. |
-| **Sonnet** (e.g. `claude-3-5-sonnet-latest` or current Sonnet id) | If **generated code or answers** look weak with Haiku, step up here for better reasoning on the same pipeline. |
-| **Opus** | **Usually avoid** for APEX: highest cost/latency; reserve for rare cases where you explicitly need maximum capability and accept the bill. |
+| Tier | Use when |
+|------|----------|
+| **Haiku** | Default choice; usually enough for JSON-shaped outputs + reviews |
+| **Sonnet** | Haiku quality is too weak for your task |
+| **Opus** | Rarely worth it here—high cost/latency for this workload |
 
-Exact model strings change over time—always confirm the id in Anthropic’s model documentation.
+Confirm current model ids in [Anthropic’s docs](https://docs.anthropic.com/en/docs/about-claude/models).
 
-### Config file shape (`~/.apex/config.json`)
+### Config file
 
-Written by `apex init` / `apex setup`:
+Written by `apex init`:
 
 ```json
 {
@@ -55,59 +55,88 @@ Written by `apex init` / `apex setup`:
 }
 ```
 
-On POSIX the config file is chmod **`600`** when possible, and the short-lived `config.json.tmp` used during saves is restricted the same way before rename. **Treat `~/.apex/config.json` like a password file** (plaintext secret).
+On POSIX, saves use mode **600** where possible. Treat the file like a credential.
 
-`apex serve` loads MCP/FastMCP only for that subcommand; `apex init` / `apex setup` do not import the MCP stack.
+`apex serve` lazy-imports FastMCP; `apex init` does not.
 
-### CLI output (scripting)
+### CLI streams
 
-- Normal prompts and summaries go to **stdout**.
-- Errors and fatal messages (e.g. missing API key after `apex llm`) go to **stderr** with a non-zero exit code where applicable.
+- Normal output → **stdout**
+- Errors / fatal exits → **stderr**
 
-## Code Execution Backend (optional)
+## Code execution backend
 
-- `APEX_EXECUTION_BACKEND_URL` (optional; required only for `code_ground_truth=true`)
-- `APEX_EXECUTION_BACKEND_API_KEY` (optional; enables Bearer auth)
-- `APEX_EXECUTION_BACKEND_AUTH_HEADER` (optional; default `Authorization`)
-- `APEX_EXECUTION_BACKEND_RETRIES` (optional; default `2`) — retries transient 502/503/504 responses
+| Variable | Purpose |
+|----------|---------|
+| `APEX_EXECUTION_BACKEND_URL` | Required for `code_ground_truth` execution |
+| `APEX_EXECUTION_BACKEND_API_KEY` | Optional Bearer token |
+| `APEX_EXECUTION_BACKEND_AUTH_HEADER` | Default `Authorization` |
+| `APEX_EXECUTION_BACKEND_RETRIES` | Default `2` (502/503/504) |
+
+## Top-level errors (sanitized by default)
+
+If `apex_run` hits an **uncaught** exception before building a normal pipeline result, the tool still returns `verdict: blocked`. Clients get:
+
+- **`error_code`** — Stable category (`apex.configuration`, `apex.validation`, `apex.network`, …)
+- **`error`** — Short, safe message (no raw stack, paths, or URLs)
+- **`error_type`** — Exception class name (diagnostic only)
+
+| Variable | Effect |
+|----------|--------|
+| `APEX_EXPOSE_ERROR_DETAILS` | If truthy, adds **`error_detail`**: raw message truncated (~8k). **Avoid** on untrusted or multi-tenant MCP hosts. |
 
 ## Concurrency
 
-- `APEX_LLM_CONCURRENCY` (default: `2`)
+`APEX_LLM_CONCURRENCY` (default `2`) caps concurrent ensemble generation.
 
-This bounds concurrent ensemble generation and helps keep latency predictable.
+## Progress events (structured logs)
+
+Coarse **run / pipeline / step** JSON lines on logger **`apex.progress`** (not LLM token streaming).
+
+| Variable | Effect |
+|----------|--------|
+| `APEX_PROGRESS_LOG` | If truthy → emit `apex.progress/v1` events (see [progress-events.md](progress-events.md)) |
 
 ## Run ledger (SQLite)
 
-APEX persists a lightweight **SQLite** audit trail of each `apex_run` response (verdict, trace validation, step timing/shape, optional step `detail`). The file is a normal SQLite database (WAL mode); it is created on first recorded run.
+Each finished `apex_run` can append one row + step rows to a local DB (WAL). Created on first write.
 
-**Default:** `~/.apex/ledger.sqlite3` (ledger **on** unless you opt out).
+| Variable | Effect |
+|----------|--------|
+| — | Default file: **`~/.apex/ledger.sqlite3`** (logging **on**) |
+| `APEX_LEDGER_DISABLED` | Truthy → no writes; `apex ledger` reports disabled |
+| `APEX_LEDGER_PATH` | Override DB path |
 
-- `APEX_LEDGER_DISABLED` — set to `1` / `true` / `yes` to turn the ledger off entirely (no writes, `apex ledger` reports disabled).
-- `APEX_LEDGER_PATH` — override the SQLite file path (still disabled if `APEX_LEDGER_DISABLED` is truthy).
-- `APEX_LEDGER_STORE_STEP_DETAIL` — `0` (default) or `1`.
-  - When `0`, the ledger stores step trace shape and timing, but does not persist `pipeline_steps[*].detail` (step payloads can be large and may include sensitive evidence).
-  - When `1`, it stores `detail_json` with truncation.
-- `APEX_LEDGER_MAX_DETAIL_CHARS` — default `65536`; truncates stored step `detail` to cap DB growth.
-- `APEX_LEDGER_BUSY_TIMEOUT_MS` — default `2000`; SQLite busy timeout when concurrent writes happen.
+**Inspect JSON:** `apex ledger query` (same data shape as MCP `ledger_query`). Optional `--limit`, `--run-id`.
 
-**CLI:** `apex ledger` or `apex ledger summary` prints counts, verdict breakdown, trace-validation failures, and recent runs.
+## Repo context (MCP read tools)
 
-## Conventions (optional)
+Optional allowlisted filesystem reads for `repo_read_file` / `repo_glob`. [repo-context.md](repo-context.md).
 
-- Repo-local: `.apex/conventions.md` (or `.apex/conventions.txt`)
-- Global/company: set `APEX_GLOBAL_CONVENTIONS_PATH` to point at a file
+| Variable | Effect |
+|----------|--------|
+| `APEX_REPO_CONTEXT_ROOT` | Directory path; unset → repo tools disabled |
+| `APEX_REPO_CONTEXT_DISABLED` | Truthy → disabled |
+| `APEX_REPO_CONTEXT_MAX_FILE_BYTES` | Per-file read cap |
+| `APEX_REPO_CONTEXT_MAX_GLOB_RESULTS` | Max matches per glob |
+| `APEX_REPO_CONTEXT_MAX_PATTERN_LEN` | Max pattern string length |
+| `APEX_LEDGER_STORE_STEP_DETAIL` | `0` (default): no `pipeline_steps[*].detail` payload in DB. `1`: store JSON, truncated |
+| `APEX_LEDGER_MAX_DETAIL_CHARS` | Default `65536` |
+| `APEX_LEDGER_BUSY_TIMEOUT_MS` | Default `2000` |
 
-APEX will merge global + repo-local + per-call `repo_conventions` (in that order).
+**CLI:** `apex ledger` / `apex ledger summary` — counts, verdict breakdown, trace-validation failures, recent runs.
 
-## Findings policy (optional)
+## Conventions merge
 
-Loaded by `apex.config.policy` from the paths below. Policy can **only filter findings that are not verdict-critical**: **`high` and `medium` severities are always kept** so blocks and `high_verified` gating cannot be weakened. Typically you use this to hide noisy **`low`** findings by type or severity.
+1. `APEX_GLOBAL_CONVENTIONS_PATH` (optional file)  
+2. `.apex/conventions.md` or `.apex/conventions.txt` in repo  
+3. Per-call `repo_conventions` on the tool  
 
-- Repo-local: `.apex/policy.json` (resolved from the process current working directory unless you pass `repo_root` to `load_findings_policy` in custom integrations)
-- Global/company: set `APEX_GLOBAL_POLICY_PATH` to point at a JSON file
+Later steps override earlier.
 
-Schema (both locations):
+## Findings policy
+
+Loads `.apex/policy.json` (cwd) and/or `APEX_GLOBAL_POLICY_PATH`. Policy may drop **low** noise only; **`high` and `medium` are never removed** (verdicts cannot be weakened that way).
 
 ```json
 {
@@ -116,11 +145,6 @@ Schema (both locations):
 }
 ```
 
-## Scoring thresholds (code reference)
+## Tunable thresholds
 
-Tune in `apex.config.constants` (documented in that module), including:
-
-- `HIGH_VERIFIED_CONVERGENCE_THRESHOLD` — minimum ensemble convergence for `high_verified` when other signals allow it
-- `TEXT_ANSWER_CONVERGENCE_WEIGHT` / `TEXT_CLAIMS_CONVERGENCE_WEIGHT` — text convergence / best-candidate selection blend
-- `ENSEMBLE_RUNS_MIN_EFFECTIVE` / `ENSEMBLE_RUNS_MAX_EFFECTIVE` — clamp applied in `apex_run`
-
+See `apex.config.constants` (e.g. `HIGH_VERIFIED_CONVERGENCE_THRESHOLD`, ensemble clamp `ENSEMBLE_RUNS_*`).

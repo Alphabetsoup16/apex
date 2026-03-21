@@ -9,7 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from apex.config.constants import LEDGER_QUERY_MAX_LIMIT
 from apex.models import ApexRunToolResult
+
+LEDGER_QUERY_SCHEMA = "apex.ledger.query/v1"
 
 
 def default_ledger_path() -> Path:
@@ -246,3 +249,139 @@ async def record_apex_run_to_ledger_if_enabled(result: ApexRunToolResult) -> Non
     except Exception:
         # Ledger must never break the primary verification result path.
         return
+
+
+def _row_to_run_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "run_id": row["run_id"],
+        "created_at": row["created_at"],
+        "verdict": row["verdict"],
+        "mode": row["mode"],
+        "llm_model": row["llm_model"],
+        "output_mode": row["output_mode"],
+        "convergence": row["convergence"],
+        "baseline_similarity": row["baseline_similarity"],
+        "run_wall_ms": row["run_wall_ms"],
+        "trace_validation_ok": bool(row["trace_validation_ok"]),
+    }
+
+
+def _row_to_step_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "run_id": row["run_id"],
+        "step_idx": row["step_idx"],
+        "id": row["id"],
+        "requirement": row["requirement"],
+        "ok": bool(row["ok"]),
+        "duration_ms": row["duration_ms"],
+        "detail_json": row["detail_json"],
+        "detail_truncated": bool(row["detail_truncated"]),
+    }
+
+
+def read_ledger_snapshot(
+    *,
+    limit: int = 20,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    Read-only ledger snapshot for MCP / CLI (never raises for missing DB).
+
+    - ``run_id`` set: return that run (if present) and its steps.
+    - Otherwise: return up to ``limit`` recent runs (newest first), no steps.
+
+    ``limit`` is clamped to ``1..LEDGER_QUERY_MAX_LIMIT``.
+    """
+    cfg = load_ledger_config()
+    if cfg is None:
+        return {
+            "schema": LEDGER_QUERY_SCHEMA,
+            "ledger_enabled": False,
+            "db_path": None,
+            "runs": [],
+            "steps": [],
+            "detail": "Ledger disabled (APEX_LEDGER_DISABLED).",
+        }
+
+    try:
+        lim_raw = int(limit)
+    except (TypeError, ValueError):
+        lim_raw = 20
+    lim = max(1, min(lim_raw, LEDGER_QUERY_MAX_LIMIT))
+    path = cfg.db_path
+    if not path.is_file():
+        return {
+            "schema": LEDGER_QUERY_SCHEMA,
+            "ledger_enabled": True,
+            "db_path": str(path),
+            "runs": [],
+            "steps": [],
+            "detail": "Database file not found yet (no runs recorded).",
+        }
+
+    uri = f"file:{path.as_posix()}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        if run_id:
+            r = conn.execute(
+                """
+                SELECT run_id, created_at, verdict, mode, llm_model, output_mode,
+                       convergence, baseline_similarity, run_wall_ms, trace_validation_ok
+                FROM runs WHERE run_id = ?;
+                """,
+                (run_id,),
+            ).fetchone()
+            runs_out: list[dict[str, Any]] = []
+            steps_out: list[dict[str, Any]] = []
+            if r is not None:
+                runs_out.append(_row_to_run_dict(r))
+                step_rows = conn.execute(
+                    """
+                    SELECT run_id, step_idx, id, requirement, ok, duration_ms,
+                           detail_json, detail_truncated
+                    FROM pipeline_steps
+                    WHERE run_id = ?
+                    ORDER BY step_idx ASC;
+                    """,
+                    (run_id,),
+                ).fetchall()
+                steps_out = [_row_to_step_dict(sr) for sr in step_rows]
+            return {
+                "schema": LEDGER_QUERY_SCHEMA,
+                "ledger_enabled": True,
+                "db_path": str(path),
+                "runs": runs_out,
+                "steps": steps_out,
+                "detail": None if runs_out else f"No run found for run_id={run_id!r}.",
+            }
+
+        rows = conn.execute(
+            """
+            SELECT run_id, created_at, verdict, mode, llm_model, output_mode,
+                   convergence, baseline_similarity, run_wall_ms, trace_validation_ok
+            FROM runs
+            ORDER BY created_at DESC
+            LIMIT ?;
+            """,
+            (lim,),
+        ).fetchall()
+        return {
+            "schema": LEDGER_QUERY_SCHEMA,
+            "ledger_enabled": True,
+            "db_path": str(path),
+            "runs": [_row_to_run_dict(r) for r in rows],
+            "steps": [],
+            "detail": None,
+        }
+    except sqlite3.Error as e:
+        return {
+            "schema": LEDGER_QUERY_SCHEMA,
+            "ledger_enabled": True,
+            "db_path": str(path),
+            "runs": [],
+            "steps": [],
+            "detail": f"SQLite read error: {e}",
+        }
+    finally:
+        conn.close()

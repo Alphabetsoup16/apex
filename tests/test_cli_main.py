@@ -40,3 +40,18 @@ def test_cli_ledger_summary_dispatches(monkeypatch) -> None:
     apex_main.main(["ledger"])
     apex_main.main(["ledger", "summary"])
     assert called == ["summary", "summary"]
+
+
+def test_cli_ledger_query_dispatches(monkeypatch) -> None:
+    from apex.cli import ledger_cmd
+
+    calls: list[tuple[int, str | None]] = []
+
+    def fake_query(*, limit: int, run_id: str | None) -> None:
+        calls.append((limit, run_id))
+
+    monkeypatch.setattr(ledger_cmd, "cmd_ledger_query", fake_query)
+
+    apex_main.main(["ledger", "query"])
+    apex_main.main(["ledger", "query", "--limit", "5", "--run-id", "abc"])
+    assert calls == [(20, None), (5, "abc")]
