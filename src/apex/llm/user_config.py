@@ -10,7 +10,6 @@ from typing import Any
 from apex.config.env import env_str
 
 CONFIG_VERSION = 1
-# Default for `apex init`: fast/cheap tier fits APEX's many LLM calls per run.
 DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-latest"
 DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 

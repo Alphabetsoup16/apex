@@ -7,9 +7,6 @@ from pathlib import Path
 from apex.config.env import env_str
 from apex.models import AdversarialReview, Finding
 
-# Severities that participate in verdict policy (blocks or ``high_verified`` gating).
-# These must never be removed by ``ignored_types`` / ``ignored_severities`` so policy
-# cannot weaken safety outcomes.
 _VERDICT_RELEVANT_SEVERITIES: frozenset[str] = frozenset({"high", "medium"})
 
 

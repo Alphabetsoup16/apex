@@ -62,6 +62,25 @@ def test_finalize_attaches_telemetry_and_uncertainty() -> None:
     assert u["adversarial_finding_count"] == 1
 
 
+def test_uncertainty_inspection_max_severity_picks_highest() -> None:
+    """Raw inspection findings in metadata: ``high`` wins over ``low``."""
+    r = ApexRunToolResult(
+        verdict="needs_review",
+        output="",
+        adversarial_review=None,
+        metadata={
+            "inspection_review": {
+                "findings": [
+                    {"severity": "low", "type": "a", "confidence": 0.1, "evidence": "x"},
+                    {"severity": "high", "type": "b", "confidence": 0.9, "evidence": "y"},
+                ]
+            },
+        },
+    )
+    u = build_uncertainty_v1(r, mode="code")
+    assert u["code_inspection_max_severity"] == "high"
+
+
 def test_uncertainty_code_execution_surface_disabled() -> None:
     r = ApexRunToolResult(
         verdict="needs_review",

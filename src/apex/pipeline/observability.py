@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from apex.config.constants import (
     CONVERGENCE_MODERATE_THRESHOLD,
@@ -15,16 +15,18 @@ from apex.pipeline.trace_contract import validate_pipeline_steps
 
 _SEVERITY_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3}
 
+SeverityLabel = Literal["none", "low", "medium", "high"]
 
-def _max_severity_label(findings: list[Finding]) -> Literal["none", "low", "medium", "high"]:
+
+def _max_severity_label(findings: list[Finding]) -> SeverityLabel:
     if not findings:
         return "none"
-    best = "none"
+    best: SeverityLabel = "none"
     for f in findings:
         sev = f.severity
         if _SEVERITY_RANK[sev] > _SEVERITY_RANK[best]:
-            best = sev
-    return best  # type: ignore[return-value]
+            best = cast(SeverityLabel, sev)
+    return best
 
 
 def _inspection_findings_from_metadata(metadata: dict[str, Any]) -> list[dict[str, Any]]:
@@ -35,19 +37,18 @@ def _inspection_findings_from_metadata(metadata: dict[str, Any]) -> list[dict[st
     return raw if isinstance(raw, list) else []
 
 
-def _max_severity_from_raw_findings(
-    rows: list[dict[str, Any]],
-) -> Literal["none", "low", "medium", "high"]:
-    best = "none"
+def _max_severity_from_raw_findings(rows: list[dict[str, Any]]) -> SeverityLabel:
+    best: SeverityLabel = "none"
     for r in rows:
         if not isinstance(r, dict):
             continue
         sev = r.get("severity")
         if sev not in _SEVERITY_RANK:
             continue
-        if _SEVERITY_RANK[sev] > _SEVERITY_RANK[best]:  # type: ignore[index]
-            best = sev
-    return best  # type: ignore[return-value]
+        label = cast(SeverityLabel, sev)
+        if _SEVERITY_RANK[label] > _SEVERITY_RANK[best]:
+            best = label
+    return best
 
 
 def _convergence_band(conv: float | None) -> Literal["strong", "moderate", "weak", "unknown"]:
@@ -140,6 +141,8 @@ def build_uncertainty_v1(
 ) -> dict[str, Any]:
     """
     Compact signals for routing / dashboards — derived only from existing result fields.
+
+    ``schema`` is ``UNCERTAINTY_SCHEMA_V1`` from ``apex.config.contracts``.
     """
     md = result.metadata
     conv: float | None = None
@@ -155,7 +158,7 @@ def build_uncertainty_v1(
     adv = result.adversarial_review
     if adv is None:
         adv_count = 0
-        adv_max: Literal["none", "low", "medium", "high"] = "none"
+        adv_max: SeverityLabel = "none"
     else:
         adv_count = len(adv.findings)
         adv_max = _max_severity_label(list(adv.findings))

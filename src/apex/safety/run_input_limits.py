@@ -116,5 +116,4 @@ def validate_run_inputs(
     return None
 
 
-# Backward-compatible name used by MCP wrapper docs.
 validate_run_tool_inputs = validate_run_inputs

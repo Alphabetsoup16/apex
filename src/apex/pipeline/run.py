@@ -26,7 +26,6 @@ from apex.pipeline.top_level_errors import (
 from apex.runtime.run_limits import load_run_limit_settings, run_concurrency_gate
 from apex.safety.run_input_limits import validate_run_inputs
 
-# Re-export for callers/tests that import from ``apex.pipeline.run``.
 __all__ = ["LLMClientFactory", "apex_run", "resolve_run_modes"]
 
 

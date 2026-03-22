@@ -8,14 +8,9 @@ and dependent docs (``mcp-tools``, ``tool-interface``).
 
 from __future__ import annotations
 
-# --- MCP operator tools (``apex.mcp.diagnostics``) ---
 HEALTH_SCHEMA_V1 = "apex.health/v1"
 CONFIG_DESCRIBE_SCHEMA_V1 = "apex.config.describe/v1"
-
-# --- ``health`` body: orchestrator-facing capability token ---
 VERIFICATION_CONTRACT_V1 = "apex.verify_step.v1"
-
-# --- ``finalize_run_result`` → ``metadata.telemetry`` / ``metadata.uncertainty`` ---
 TELEMETRY_SCHEMA_V1 = "apex.telemetry/v1"
 UNCERTAINTY_SCHEMA_V1 = "apex.uncertainty/v1"
 

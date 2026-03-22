@@ -1,3 +1,5 @@
+"""Stable ``error_code`` strings for tool results; renames are API-breaking (see docs)."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -9,7 +11,6 @@ from pydantic import ValidationError as PydanticValidationError
 from apex.code_ground_truth.executor_client import ExecutionBackendError
 from apex.config.env import env_bool
 
-# Stable, documented codes for MCP clients and operators (do not rename lightly).
 APEX_CONFIGURATION = "apex.configuration"
 APEX_VALIDATION = "apex.validation"
 APEX_IO = "apex.io"

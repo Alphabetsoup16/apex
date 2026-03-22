@@ -25,12 +25,10 @@ from typing import Any
 
 from apex.config.env import env_bool
 
-# Stable schema id for consumers (jq, log routers, MCP log tailers).
 PROGRESS_EVENT_SCHEMA = "apex.progress/v1"
 
 _LOG = logging.getLogger("apex.progress")
 
-# Documented event kinds (extend here + docs/progress-events.md + tests).
 RUN_START = "run_start"
 CLIENT_READY = "client_ready"
 PIPELINE_ENTER = "pipeline_enter"

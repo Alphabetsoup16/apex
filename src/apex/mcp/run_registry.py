@@ -1,9 +1,10 @@
 """
-Track in-flight verification tasks (MCP tool ``run`` / ``apex_run``) by optional
-``correlation_id`` for cooperative cancel.
+Track in-flight verification tasks (MCP ``run`` / ``apex_run``) by optional ``correlation_id``.
 
-Reservation happens **before** ``create_task`` so ``cancel_run`` never returns ``not_found`` for an
-id the server has already accepted. ``asyncio.Task.cancel()`` is best-effort (``await`` boundaries).
+``_registry`` maps id → running ``Task`` or ``None`` (reserved before bind).
+``_pending_cancel_before_bind`` records cancel requested while still reserved.
+Reservation precedes ``create_task`` so ``cancel_run`` is not ``not_found`` for accepted ids.
+``Task.cancel()`` is cooperative (``await`` boundaries).
 """
 
 from __future__ import annotations
@@ -14,9 +15,7 @@ from typing import Any
 from apex.config.constants import MCP_CORRELATION_ID_MAX_LEN
 
 _lock = asyncio.Lock()
-# correlation_id -> Task once bound; None = reserved slot (task not yet registered)
 _registry: dict[str, asyncio.Task[Any] | None] = {}
-# Cancel while reserved (no task yet); honoured in ``bind_correlation_task``.
 _pending_cancel_before_bind: set[str] = set()
 
 

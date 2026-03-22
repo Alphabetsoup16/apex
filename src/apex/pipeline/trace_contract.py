@@ -1,8 +1,9 @@
+"""Required keys for each ``metadata.pipeline_steps`` row (``detail`` may be empty)."""
+
 from __future__ import annotations
 
 from typing import Any, TypedDict
 
-# Every row in ``metadata.pipeline_steps`` must expose these keys (``detail`` may be empty).
 PIPELINE_STEP_REQUIRED_KEYS: frozenset[str] = frozenset(
     {"id", "requirement", "ok", "duration_ms", "detail"}
 )

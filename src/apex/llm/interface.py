@@ -35,5 +35,4 @@ class LLMClient(Protocol):
     ) -> dict[str, Any]: ...
 
 
-# Callable invoked once per pipeline run; default resolves env / user config (see loader).
 LLMClientFactory: TypeAlias = Callable[[], LLMClient]
