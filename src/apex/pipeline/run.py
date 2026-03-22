@@ -4,6 +4,7 @@ import asyncio
 import time
 
 from apex.ledger import record_apex_run_to_ledger_if_enabled
+from apex.llm.interface import LLMClientFactory
 from apex.models import ApexRunToolResult, Mode
 from apex.observability.progress_events import (
     RUN_REJECTED,
@@ -26,7 +27,7 @@ from apex.runtime.run_limits import load_run_limit_settings, run_concurrency_gat
 from apex.safety.run_input_limits import validate_run_inputs
 
 # Re-export for callers/tests that import from ``apex.pipeline.run``.
-__all__ = ["apex_run", "resolve_run_modes"]
+__all__ = ["LLMClientFactory", "apex_run", "resolve_run_modes"]
 
 
 async def apex_run(
@@ -43,12 +44,16 @@ async def apex_run(
     output_mode: str = "candidate",
     run_id: str | None = None,
     supplementary_context: str | None = None,
+    llm_client_factory: LLMClientFactory | None = None,
 ) -> ApexRunToolResult:
     """
     ``run_id`` — optional stable id (e.g. MCP pre-allocated). Default: random UUID.
 
     ``supplementary_context`` — optional operator-provided text included in **code** doc
     inspection only (not token streaming; bounded at MCP boundary).
+
+    ``llm_client_factory`` — optional ``() -> LLMClient``; default loads from env/config
+    (``apex.llm.loader.load_llm_client_from_env``). Embedders pass a factory; MCP omits.
     """
     ctx = build_apex_run_context(
         prompt=prompt,
@@ -63,6 +68,7 @@ async def apex_run(
         output_mode=output_mode,
         run_id=run_id,
         supplementary_context=supplementary_context,
+        llm_client_factory=llm_client_factory,
     )
 
     bad_in = validate_run_inputs(

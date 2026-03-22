@@ -7,7 +7,8 @@ APEX verification pipeline (light layer by default).
 - ``text_mode`` / ``code_mode``: mode-specific flows.
 - ``trace_contract``: required keys + ``PipelineStepTraceDict`` for ``pipeline_steps[]``.
 - ``observability``: ``finalize_run_result`` → ``metadata.telemetry`` + ``metadata.uncertainty``.
-- ``run``: ``apex_run`` orchestration (limits, guards, timeout).
+- ``run``: ``apex_run`` orchestration (limits, guards, timeout); re-exports
+  ``resolve_run_modes``, ``LLMClientFactory``.
 - ``run_context``: frozen ``ApexRunContext`` + ``resolve_run_modes``.
 - ``run_execute``: text/code pipeline body (LLM work, finalize, ledger dispatch).
 - ``guard_metadata``: blocked-run metadata + ensemble clamp (MCP + ``apex_run`` guards).
@@ -18,6 +19,6 @@ Optional sandbox execution for code lives in ``code_mode`` behind ``code_ground_
 the execution client contract remains under ``apex.code_ground_truth``.
 """
 
-from apex.pipeline.run import apex_run
+from apex.pipeline.run import LLMClientFactory, apex_run, resolve_run_modes
 
-__all__ = ["apex_run"]
+__all__ = ["LLMClientFactory", "apex_run", "resolve_run_modes"]

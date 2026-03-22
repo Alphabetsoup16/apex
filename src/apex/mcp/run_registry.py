@@ -1,5 +1,6 @@
 """
-Track in-flight ``apex.run`` tasks by optional ``correlation_id`` for cooperative cancel.
+Track in-flight verification tasks (MCP tool ``run`` / ``apex_run``) by optional
+``correlation_id`` for cooperative cancel.
 
 Reservation happens **before** ``create_task`` so ``cancel_run`` never returns ``not_found`` for an
 id the server has already accepted. ``asyncio.Task.cancel()`` is best-effort (``await`` boundaries).

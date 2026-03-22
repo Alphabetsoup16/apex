@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol, TypeAlias
 
 
 class LLMClient(Protocol):
@@ -32,3 +33,7 @@ class LLMClient(Protocol):
         max_tokens: int,
         temperature: float,
     ) -> dict[str, Any]: ...
+
+
+# Callable invoked once per pipeline run; default resolves env / user config (see loader).
+LLMClientFactory: TypeAlias = Callable[[], LLMClient]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apex.pipeline.run_context import resolve_run_modes
+from apex.pipeline import resolve_run_modes
 
 
 def test_resolve_auto_uses_inference() -> None:

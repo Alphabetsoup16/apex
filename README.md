@@ -64,6 +64,7 @@ Main `run` inputs: `prompt`, `mode` (`auto` | `text` | `code`), `code_ground_tru
 **Docs:**
 
 - [Architecture](docs/architecture.md) · [Flow](docs/flow.md) · [Pipeline steps](docs/pipeline-steps.md)
+- [Integrations](docs/integration.md) · [Skill playbook](docs/skill-apex-verification.md) (agent hosts)
 - [MCP tools](docs/mcp-tools.md) · [Tool contract](docs/tool-interface.md) · [Verification](docs/verification.md)
 - [Code execution](docs/code-execution.md) · [Safety](docs/safety.md) · [Configuration](docs/configuration.md)
 
@@ -74,10 +75,12 @@ Main `run` inputs: `prompt`, `mode` (`auto` | `text` | `code`), `code_ground_tru
 
 ## Contributing
 
+**[CONTRIBUTING.md](CONTRIBUTING.md)** · **[AGENTS.md](AGENTS.md)**
+
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 make check
 ```
 
-Ruff: `python -m ruff` if installed, else `vendor/bin/ruff` (optional local copy). Eval-style regressions: `tests/eval/`.
+Ruff: `python -m ruff` or `vendor/bin/ruff`. Regressions: `tests/eval/`.

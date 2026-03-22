@@ -5,15 +5,12 @@ import asyncio
 import pytest
 
 import apex.pipeline.run as pipeline_run
+import apex.pipeline.run_context as run_context
 import apex.pipeline.text_mode as text_mode
 from apex.models import AdversarialReview, TextCompletion
 from apex.pipeline import run_execute
 from apex.pipeline.top_level_errors import APEX_CAPACITY, APEX_RUN_TIMEOUT
-
-
-class _FakeClient:
-    def __init__(self) -> None:
-        self.model = "fake-limits"
+from tests.fakes import FakeLLMClient
 
 
 def test_concurrency_gate_try_acquire_and_release() -> None:
@@ -53,7 +50,11 @@ def test_apex_run_capacity_rejects_when_limit_reached(monkeypatch: pytest.Monkey
         await resume.wait()
         raise AssertionError("unreachable after cancel")
 
-    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient())
+    monkeypatch.setattr(
+        run_context,
+        "load_llm_client_from_env",
+        lambda: FakeLLMClient("fake-limits"),
+    )
     monkeypatch.setattr(run_execute, "run_text_mode", slow_run_text)
 
     async def main() -> None:
@@ -86,7 +87,11 @@ def test_apex_run_wall_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_review_text(*, client, task_prompt: str, candidate, max_tokens: int):
         return AdversarialReview(findings=[])
 
-    monkeypatch.setattr(run_execute, "load_llm_client_from_env", lambda: _FakeClient())
+    monkeypatch.setattr(
+        run_context,
+        "load_llm_client_from_env",
+        lambda: FakeLLMClient("fake-limits"),
+    )
     monkeypatch.setattr(text_mode, "generate_text_variants", slow_gen)
     monkeypatch.setattr(text_mode, "review_text", fake_review_text)
     monkeypatch.setattr(text_mode, "text_convergence", lambda variants: 0.5)

@@ -8,41 +8,19 @@ import pytest
 
 import apex.pipeline.code_mode as code_mode
 import apex.pipeline.run as pipeline_run
+import apex.pipeline.run_context as run_context
 import apex.pipeline.text_mode as text_mode
-from apex.models import (
-    AdversarialReview,
-    CodeFile,
-    CodeSolution,
-    CodeTests,
-    Finding,
-    TextCompletion,
-)
-from apex.pipeline import run_execute
+from apex.models import AdversarialReview, Finding, TextCompletion
 from tests.eval.cases import ALL_CASES, RegressionCase
-
-
-class _FakeClient:
-    def __init__(self, model: str) -> None:
-        self.model = model
-
-
-def _solution_bundle() -> CodeSolution:
-    return CodeSolution(files=[CodeFile(path="solution.py", content="def f():\n    return 1\n")])
-
-
-def _tests_bundle(v: int) -> CodeTests:
-    return CodeTests(
-        files=[CodeFile(path="test_solution.py", content=f"def test_v(v={v}):\n    assert True\n")],
-        test_framework="pytest",
-    )
+from tests.fakes import FakeLLMClient, sample_code_solution, sample_code_tests
 
 
 def _patch_for_case(monkeypatch: pytest.MonkeyPatch, case: RegressionCase) -> None:
     if case.mode == "text":
         monkeypatch.setattr(
-            run_execute,
+            run_context,
             "load_llm_client_from_env",
-            lambda: _FakeClient("fake-text"),
+            lambda: FakeLLMClient("fake-text"),
         )
 
         if case.name == "text_standard":
@@ -88,21 +66,21 @@ def _patch_for_case(monkeypatch: pytest.MonkeyPatch, case: RegressionCase) -> No
 
     elif case.mode == "code":
         monkeypatch.setattr(
-            run_execute,
+            run_context,
             "load_llm_client_from_env",
-            lambda: _FakeClient("fake-code"),
+            lambda: FakeLLMClient("fake-code"),
         )
 
         if case.name == "code_spec_only":
 
             async def fake_generate_code_solution_variants(*, client, prompt: str, config):
-                return [_solution_bundle()]
+                return [sample_code_solution()]
 
             async def fake_generate_code_tests(
                 *, client, prompt: str, config, suite_label: str, temperature: float
             ):
                 assert suite_label == "tests_v1"
-                return _tests_bundle(1)
+                return sample_code_tests(variant=1)
 
             async def fake_review_code(
                 *,

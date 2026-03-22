@@ -6,6 +6,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Literal
 
+from apex.llm.interface import LLMClientFactory
+from apex.llm.loader import load_llm_client_from_env
 from apex.models import Mode
 from apex.pipeline.guard_metadata import blocked_run_base_metadata, clamp_ensemble_runs
 from apex.pipeline.helpers import infer_mode_from_prompt
@@ -44,6 +46,7 @@ class ApexRunContext:
     output_mode: str
     supplementary_context: str | None
     prompt: str
+    llm_client_factory: LLMClientFactory
 
     def blocked_base_metadata(self, timings_total_ms: int = 0) -> dict[str, object]:
         """Shared ``metadata`` keys for blocked results (aligned with MCP preflight)."""
@@ -75,9 +78,11 @@ def build_apex_run_context(
     output_mode: str = "candidate",
     run_id: str | None = None,
     supplementary_context: str | None = None,
+    llm_client_factory: LLMClientFactory | None = None,
 ) -> ApexRunContext:
     ens_req, ens_eff = clamp_ensemble_runs(ensemble_runs)
     actual_mode, inferred = resolve_run_modes(prompt=prompt, mode=mode)
+    factory = llm_client_factory or load_llm_client_from_env
     return ApexRunContext(
         run_id=run_id or str(uuid.uuid4()),
         mode=mode,
@@ -94,4 +99,5 @@ def build_apex_run_context(
         output_mode=output_mode,
         supplementary_context=supplementary_context,
         prompt=prompt,
+        llm_client_factory=factory,
     )

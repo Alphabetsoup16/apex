@@ -10,6 +10,9 @@ def load_llm_client_from_env() -> LLMClient:
     """
     Load an ``LLMClient`` from the environment and/or user config file.
 
+    Default ``llm_client_factory`` for ``ApexRunContext`` / ``apex_run`` when the caller
+    does not inject one. Embedders may pass any ``() -> LLMClient`` instead.
+
     **Precedence (highest first):** environment variables, then ``~/.apex/config.json``
     (unless ``APEX_USER_CONFIG_PATH`` is set). This keeps CI and production on pure env
     while local devs can run ``apex init`` (or ``apex setup``).

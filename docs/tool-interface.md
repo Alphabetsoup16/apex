@@ -1,8 +1,10 @@
 # Tool interface (MCP)
 
-The MCP server exposes **`run`** plus **operator** tools (`health`, `describe_config`, `ledger_query`, `cancel_run`). [mcp-tools.md](mcp-tools.md) · pipeline map: [flow.md](flow.md).
+The MCP server exposes **`run`** plus **operator** tools (`health`, `describe_config`, `ledger_query`, `cancel_run`). [mcp-tools.md](mcp-tools.md) · pipeline map: [flow.md](flow.md) · host orientation: [integration.md](integration.md).
 
 Inputs to **`run`** are validated by FastMCP / Pydantic; outputs are JSON-serializable. String **size / NUL** bounds are enforced inside **`apex_run`** via `apex.safety.run_input_limits` (same rules for MCP and embedders).
+
+**Python API:** `apex.pipeline.run.apex_run` (and `apex.pipeline.apex_run`) also accept **`llm_client_factory`**—not an MCP field; see [integration.md](integration.md).
 
 ## `run` — inputs
 

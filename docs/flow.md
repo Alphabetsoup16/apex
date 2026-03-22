@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TD
-  A["MCP: apex.run"] --> B["apex.pipeline.run.apex_run"]
+  A["MCP tool: run"] --> B["apex.pipeline.apex_run"]
 
   B --> C{mode}
   C -->|text| T1["Ensemble: N text variants"]

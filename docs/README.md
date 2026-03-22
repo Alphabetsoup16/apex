@@ -1,5 +1,7 @@
 # Documentation index
 
+**Repo:** [CONTRIBUTING.md](../CONTRIBUTING.md) · [AGENTS.md](../AGENTS.md)
+
 **Diagrams:** [flow.md](flow.md) (run pipeline), [architecture.md](architecture.md#call-direction) (adapter vs core), [mcp-tools.md](mcp-tools.md) (tool groups), [verification.md](verification.md#how-a-verdict-is-built) (verdict), [pipeline-steps.md](pipeline-steps.md#observability-automatic) (finalize + ledger), [code-execution.md](code-execution.md#endpoint) (backend POST).
 
 | Doc | What it covers |
@@ -16,10 +18,12 @@
 | [code-execution.md](code-execution.md) | Execution backend HTTP contract |
 | [safety.md](safety.md) | Redaction, CoT audit, ledger on disk |
 | [configuration.md](configuration.md) | Env vars, config file, ledger, errors |
+| [integration.md](integration.md) | MCP hosts: role in stack, discovery, correlation, orchestration boundaries |
+| [skill-apex-verification.md](skill-apex-verification.md) | Short playbook for agent instructions / embedded “skill” text |
 
 ## Where tests live
 
-- **`tests/`** — Unit/integration; patch the module under test (see [architecture.md](architecture.md)).
+- **`tests/`** — Unit/integration; patch the module under test (see [architecture.md](architecture.md)). Default LLM client: patch **`apex.pipeline.run_context.load_llm_client_from_env`** or pass **`llm_client_factory=`** to **`apex_run`**. Shared doubles: **`tests/fakes.py`**.
 - **`tests/eval/`** — Verdict + ordered `pipeline_steps` ids under fakes.
 - **`tests/test_observability.py`** — Trace contract, telemetry helpers.
 - **`tests/test_progress_events.py`** — Progress event schema + `run_async_step` hooks.
@@ -28,7 +32,8 @@
 - **`tests/test_config_env.py`** — Central env parsing (`apex.config.env`).
 - **`tests/test_mcp_server_wiring.py`** — With `mcp` installed (`pip install -e .`), asserts all expected tools are registered; otherwise **skipped**.
 - **`tests/test_ledger_read.py`** — `read_ledger_snapshot` API.
-- **`tests/test_resolve_run_modes.py`** — ``resolve_run_modes`` (``apex.pipeline.run_context``).
+- **`tests/test_resolve_run_modes.py`** — ``resolve_run_modes`` (import **`apex.pipeline`**; defined in ``run_context.py``).
+- **`tests/test_llm_client_factory.py`** — ``LLMClientFactory`` / ``ApexRunContext`` wiring.
 - **`tests/test_runtime_run_limits.py`** — Concurrency gate + wall timeout on `apex_run`.
 - **`tests/test_ledger.py`** — SQLite ledger; **`tests/conftest.py`** sets `APEX_LEDGER_DISABLED=1` so the default DB is not written unless a test clears it.
 - **`tests/test_top_level_errors.py`** — `error_code` / `APEX_EXPOSE_ERROR_DETAILS` (with cases in `test_pipeline_run.py`).

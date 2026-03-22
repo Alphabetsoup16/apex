@@ -6,7 +6,7 @@ APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **sc
 
 | Area | Module | Role |
 |------|--------|------|
-| MCP | `apex.mcp.server` | FastMCP: `run`, `health`, `describe_config`, `ledger_query`, `cancel_run`, optional `repo_*` ([mcp-tools.md](mcp-tools.md)) |
+| MCP | `apex.mcp.server` | FastMCP: `run`, `health`, `describe_config`, `ledger_query`, `cancel_run`, optional `repo_*` ([mcp-tools.md](mcp-tools.md); host-oriented: [integration.md](integration.md)) |
 | Repo context | `apex.repo_context` | Allowlisted read/glob (env-gated); [repo-context.md](repo-context.md) |
 | CLI | `apex.__main__` | `serve`, `init`/`setup`, `ledger summary` |
 | Pipeline | `apex.pipeline.*` | `apex_run` (`run.py`), `execute_apex_pipeline` (`run_execute.py`), `ApexRunContext` (`run_context.py`), text/code modes, traces, `finalize_run_result` |
@@ -22,8 +22,8 @@ APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **sc
 
 ## Entrypoints
 
-- **`apex.pipeline.run.apex_run`** — What `apex.run` calls.
-- **`apex.pipeline.run_execute.execute_apex_pipeline`** — LLM pipeline body (client load, text/code modes, finalize, ledger dispatch). Tests that stub `load_llm_client_from_env` or `run_text_mode` / `run_code_mode` should patch **`apex.pipeline.run_execute`** (where those symbols are bound), not `apex.pipeline.run`.
+- **`apex_run`** — Exported from **`apex.pipeline`** (defined in `run.py`). The MCP **`run`** tool and Python embedders call this.
+- **`apex.pipeline.run_execute.execute_apex_pipeline`** — LLM pipeline body (invokes `ctx.llm_client_factory()`, text/code modes, finalize, ledger dispatch). Tests that stub the default env-backed client should patch **`apex.pipeline.run_context.load_llm_client_from_env`** (resolved when building `ApexRunContext`). Stub `run_text_mode` / `run_code_mode` on **`apex.pipeline.run_execute`**.
 - **`apex.pipeline.helpers`** — Shared helpers (`validate_code_bundles`, mode heuristic, etc.).
 
 ## Call direction

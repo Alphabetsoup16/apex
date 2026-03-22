@@ -11,7 +11,6 @@ from apex.config.conventions import load_effective_conventions
 from apex.config.env import env_str
 from apex.generation.ensemble import EnsembleConfig
 from apex.ledger import load_ledger_config, record_apex_run_to_ledger_if_enabled
-from apex.llm.loader import load_llm_client_from_env
 from apex.models import ApexRunToolResult
 from apex.observability.progress_events import (
     CLIENT_READY,
@@ -74,7 +73,7 @@ async def execute_apex_pipeline(ctx: ApexRunContext) -> ApexRunToolResult:
             output_mode=ctx.output_mode,
         )
         try:
-            client = load_llm_client_from_env()
+            client = ctx.llm_client_factory()
             effective_conventions = load_effective_conventions(
                 repo_conventions=ctx.repo_conventions,
             )
