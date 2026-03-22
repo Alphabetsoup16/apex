@@ -14,7 +14,7 @@ APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **sc
 | Runtime limits | `apex.runtime.run_limits` | Optional `APEX_MAX_CONCURRENT_RUNS` / `APEX_RUN_MAX_WALL_MS` ([configuration.md](configuration.md)) |
 | Ledger | `apex.ledger` | SQLite append after finalize (default `~/.apex/ledger.sqlite3`; `APEX_LEDGER_DISABLED=1` off) |
 | Models | `apex.models` | Pydantic tool I/O |
-| Config | `apex.config.*` | Constants, `apex.config.env` (shared env parsing), conventions, findings policy |
+| Config | `apex.config.*` | Constants, `contracts` (versioned schema strings; [compatibility.md](compatibility.md)), `env`, conventions, findings policy |
 | Generation / Review / Scoring | `apex.generation`, `apex.review`, `apex.scoring` | Used by pipeline, not MCP directly |
 | LLM | `apex.llm.*` | Client protocol, loader, Anthropic provider |
 | Safety | `apex.safety.*` | Redaction, JSON extract, CoT heuristics |

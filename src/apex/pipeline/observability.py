@@ -1,3 +1,5 @@
+"""Finalize tool results: pipeline step validation, ``telemetry``, ``uncertainty``."""
+
 from __future__ import annotations
 
 import secrets
@@ -7,11 +9,9 @@ from apex.config.constants import (
     CONVERGENCE_MODERATE_THRESHOLD,
     HIGH_VERIFIED_CONVERGENCE_THRESHOLD,
 )
+from apex.config.contracts import TELEMETRY_SCHEMA_V1, UNCERTAINTY_SCHEMA_V1
 from apex.models import ApexRunToolResult, Finding
 from apex.pipeline.trace_contract import validate_pipeline_steps
-
-_TELEMETRY_SCHEMA = "apex.telemetry/v1"
-_UNCERTAINTY_SCHEMA = "apex.uncertainty/v1"
 
 _SEVERITY_RANK = {"none": 0, "low": 1, "medium": 2, "high": 3}
 
@@ -88,6 +88,8 @@ def build_telemetry_v1(
     """
     OTel-friendly identifiers (W3C-style hex) + one span per pipeline step.
     ``run_wall_ms`` comes from ``metadata.timings_ms.total`` when present.
+
+    ``schema`` is ``TELEMETRY_SCHEMA_V1`` from ``apex.config.contracts``.
     """
     trace_id = secrets.token_hex(16)
     root_span_id = secrets.token_hex(8)
@@ -121,7 +123,7 @@ def build_telemetry_v1(
             )
 
     return {
-        "schema": _TELEMETRY_SCHEMA,
+        "schema": TELEMETRY_SCHEMA_V1,
         "run_id": run_id,
         "trace_id": trace_id,
         "root_span_id": root_span_id,
@@ -162,7 +164,7 @@ def build_uncertainty_v1(
     insp_max = _max_severity_from_raw_findings(raw_insp)
 
     return {
-        "schema": _UNCERTAINTY_SCHEMA,
+        "schema": UNCERTAINTY_SCHEMA_V1,
         "convergence": conv,
         "convergence_band": band,
         "ensemble_divergence_hint": div_hint,
@@ -180,7 +182,9 @@ def finalize_run_result(
     run_id: str,
     mode: Literal["text", "code"],
 ) -> ApexRunToolResult:
-    """Attach ``telemetry`` + ``uncertainty``; validate ``pipeline_steps`` shape."""
+    """
+    Validate ``pipeline_steps``, attach ``metadata.telemetry`` and ``metadata.uncertainty``.
+    """
     md = dict(result.metadata)
     steps = md.get("pipeline_steps")
     issues = validate_pipeline_steps(steps)

@@ -18,6 +18,7 @@
 | [code-execution.md](code-execution.md) | Execution backend HTTP contract |
 | [safety.md](safety.md) | Redaction, CoT audit, ledger on disk |
 | [configuration.md](configuration.md) | Env vars, config file, ledger, errors |
+| [compatibility.md](compatibility.md) | Schema tokens (`apex.config.contracts`), additive vs breaking changes |
 | [integration.md](integration.md) | MCP hosts: role in stack, discovery, correlation, orchestration boundaries |
 | [skill-apex-verification.md](skill-apex-verification.md) | Short playbook for agent instructions / embedded “skill” text |
 

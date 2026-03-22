@@ -66,7 +66,7 @@ Main `run` inputs: `prompt`, `mode` (`auto` | `text` | `code`), `code_ground_tru
 - [Architecture](docs/architecture.md) · [Flow](docs/flow.md) · [Pipeline steps](docs/pipeline-steps.md)
 - [Integrations](docs/integration.md) · [Skill playbook](docs/skill-apex-verification.md) (agent hosts)
 - [MCP tools](docs/mcp-tools.md) · [Tool contract](docs/tool-interface.md) · [Verification](docs/verification.md)
-- [Code execution](docs/code-execution.md) · [Safety](docs/safety.md) · [Configuration](docs/configuration.md)
+- [Code execution](docs/code-execution.md) · [Safety](docs/safety.md) · [Configuration](docs/configuration.md) · [Compatibility](docs/compatibility.md)
 
 ## Limitations (alpha)
 

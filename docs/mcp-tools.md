@@ -24,7 +24,9 @@ Bounded reads under **`APEX_REPO_CONTEXT_ROOT`**: `repo_context_status`, `repo_r
 
 - **Schema:** `apex.health/v1`
 - **Secrets:** none
-- **Fields (non-exhaustive):** `apex_version`, `python_version`, `llm_provider_default`, `ledger_*`, `execution_backend_configured`, `progress_log_enabled`, `repo_context_enabled`, `run_limits` (`{max_concurrent, wall_ms}`; `0` = off)
+- **Fields (non-exhaustive):**
+  - **`verification_contract`** — e.g. **`apex.verify_step.v1`**: one `run` = one verification outcome; workflow/session state lives in the host ([integration.md](integration.md#stateful-orchestrators-verify-this-step)).
+  - **`apex_version`**, **`python_version`**, **`llm_provider_default`**, **`ledger_*`**, **`execution_backend_configured`**, **`progress_log_enabled`**, **`repo_context_enabled`**, **`run_limits`** (`{max_concurrent, wall_ms}`; `0` = off)
 
 ## `describe_config`
 

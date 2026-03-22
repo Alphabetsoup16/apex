@@ -1,7 +1,9 @@
 """
 Runtime configuration: thresholds, merged conventions, optional findings policy.
 
-Environment variable parsing lives in ``apex.config.env`` (shared booleans / ints / strips).
+- **Env parsing:** ``apex.config.env`` (shared booleans / ints / strips).
+- **Versioned JSON tokens** (``schema``, ``verification_contract``): ``apex.config.contracts``
+  — see ``docs/compatibility.md``.
 """
 
 from apex.config.constants import (

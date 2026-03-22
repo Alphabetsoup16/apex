@@ -23,7 +23,9 @@ Ruff (line length 100, Python 3.10+). Prefer explicit types on public APIs; `LLM
 
 ## Docs
 
-Index: [docs/README.md](docs/README.md). After behavior changes, update the relevant doc and, when applicable, [tool-interface.md](docs/tool-interface.md) / [mcp-tools.md](docs/mcp-tools.md).
+- **Index:** [docs/README.md](docs/README.md)
+- **Schema / contract tokens:** `apex.config.contracts` — [contracts.py](src/apex/config/contracts.py) · [compatibility.md](docs/compatibility.md)
+- **After behavior changes:** update the relevant doc; for MCP I/O, [tool-interface.md](docs/tool-interface.md) / [mcp-tools.md](docs/mcp-tools.md)
 
 ## Eval regressions
 

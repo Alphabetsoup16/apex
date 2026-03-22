@@ -46,6 +46,24 @@ Orchestration (e.g. “edit file → run tests → call APEX → open ticket”)
 - Aggregate many runs with their own **`correlation_id`** / trace strategy
 - Query history via **`ledger_query`** ([mcp-tools.md](mcp-tools.md))
 
+## Stateful orchestrators (“verify this step”)
+
+For platforms that keep **workflow/session state** (e.g. managed agent runtimes, Bedrock-style orchestration), treat APEX as a **bounded verification tool**, not the session store:
+
+| Host responsibility | APEX responsibility |
+|---------------------|---------------------|
+| Step graph, memory, approvals, retries | One **`run`** → `verdict`, `output`, `metadata` |
+| Map step → `correlation_id` (optional) | Cooperative **`cancel_run`**, capacity / wall **`blocked`** |
+| Merge results into working context | **`pipeline_steps`**, telemetry, optional **ledger** row |
+
+**Practical wiring**
+
+1. Boot: **`health`** — check `verification_contract` is `apex.verify_step.v1` ([mcp-tools.md](mcp-tools.md#health)).
+2. Per step: build a **`prompt`** (and **`mode`**, context fields) from the host’s state; call **`run`**.
+3. **Traceability:** use **`correlation_id`** = your workflow step / attempt id (charset [tool-interface.md](tool-interface.md)); use **`ledger_query`** or returned **`metadata`** for audits.
+4. **Failure policy:** read **`metadata.error_code`**, **`verdict`**, **`cancelled`** — drive host retries or human review ([robustness.md](robustness.md)).
+5. **Cost/latency:** each `run` triggers multiple LLM calls internally—schedule verification steps deliberately ([configuration.md](configuration.md#picking-a-model)).
+
 ## Audit & operations
 
 - **Ledger:** Append-only SQLite by default; optional disable via env ([configuration.md](configuration.md#run-ledger-sqlite), [safety.md](safety.md)).
@@ -65,3 +83,4 @@ For a short, copy-friendly playbook you can embed in host docs or agent instruct
 | [architecture.md](architecture.md) | Package layout, pipeline vs MCP |
 | [robustness.md](robustness.md) | Guarantees and client invariants |
 | [verification.md](verification.md) | Verdict semantics |
+| [compatibility.md](compatibility.md) | Versioned `schema` tokens and change policy |

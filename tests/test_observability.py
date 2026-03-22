@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from apex.config.contracts import TELEMETRY_SCHEMA_V1, UNCERTAINTY_SCHEMA_V1
 from apex.models import AdversarialReview, ApexRunToolResult, Finding
 from apex.pipeline.observability import (
     build_telemetry_v1,
@@ -50,12 +51,12 @@ def test_finalize_attaches_telemetry_and_uncertainty() -> None:
         },
     )
     out = finalize_run_result(result, run_id="rid", mode="text")
-    assert out.metadata["telemetry"]["schema"] == "apex.telemetry/v1"
+    assert out.metadata["telemetry"]["schema"] == TELEMETRY_SCHEMA_V1
     assert out.metadata["telemetry"]["run_id"] == "rid"
     assert len(out.metadata["telemetry"]["spans"]) == 1
     assert out.metadata["telemetry"]["trace_validation"]["ok"] is True
     u = out.metadata["uncertainty"]
-    assert u["schema"] == "apex.uncertainty/v1"
+    assert u["schema"] == UNCERTAINTY_SCHEMA_V1
     assert u["convergence_band"] == "weak"
     assert u["execution_surface"] == "not_applicable"
     assert u["adversarial_finding_count"] == 1

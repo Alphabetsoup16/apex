@@ -15,6 +15,11 @@
 2. **`run`** with at least `prompt`, `mode` (use explicit `text` or `code` when classification must be reliable; `auto` is heuristic-only).
 3. Read **`verdict`**, **`output`**, and **`metadata`** (especially `pipeline_steps`, `telemetry`, `uncertainty` when present). Full contract: [tool-interface.md](tool-interface.md).
 
+## Stateful orchestrators
+
+- **`health.verification_contract`** should be **`apex.verify_step.v1`** — confirms “one `run` = one verification”; your runtime keeps workflow state ([integration.md](integration.md#stateful-orchestrators-verify-this-step)).
+- Map **workflow step / attempt ids** to **`correlation_id`** when you need **cancel** or cross-service traceability.
+
 ## Long-running or cancellable runs
 
 - Pass a unique **`correlation_id`** per concurrent invocation if the host may call **`cancel_run`** ([robustness.md](robustness.md#product-semantics-clients)).
@@ -35,4 +40,4 @@
 
 ## Further reading
 
-[integration.md](integration.md) (MCP + Python `llm_client_factory`) · [flow.md](flow.md) · [safety.md](safety.md)
+[integration.md](integration.md) (verify-step pattern, Python `llm_client_factory`) · [flow.md](flow.md) · [safety.md](safety.md)

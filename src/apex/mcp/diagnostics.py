@@ -9,6 +9,11 @@ from __future__ import annotations
 import sys
 from importlib.metadata import PackageNotFoundError, version
 
+from apex.config.contracts import (
+    CONFIG_DESCRIBE_SCHEMA_V1,
+    HEALTH_SCHEMA_V1,
+    VERIFICATION_CONTRACT_V1,
+)
 from apex.config.env import env_str, env_str_or_none
 from apex.ledger import load_ledger_config, resolve_ledger_db_path
 from apex.llm.user_config import load_user_llm_config, user_config_path
@@ -28,14 +33,16 @@ def build_health_snapshot() -> dict[str, object]:
     """
     Safe process / config **flags** only (no API keys, no raw paths beyond config file hint).
 
-    Schema: ``apex.health/v1``.
+    The returned ``schema`` value is ``HEALTH_SCHEMA_V1`` from ``apex.config.contracts``.
     """
     ledger_path = resolve_ledger_db_path()
     ledger_cfg = load_ledger_config()
     exec_url = env_str("APEX_EXECUTION_BACKEND_URL")
     lim = load_run_limit_settings()
     return {
-        "schema": "apex.health/v1",
+        "schema": HEALTH_SCHEMA_V1,
+        # Stable hint for stateful orchestrators: one ``run`` = one verification outcome.
+        "verification_contract": VERIFICATION_CONTRACT_V1,
         "apex_version": _package_version(),
         "python_version": sys.version.split()[0],
         "llm_provider_default": env_str("APEX_LLM_PROVIDER") or "anthropic",
@@ -52,7 +59,7 @@ def build_config_describe_snapshot() -> dict[str, object]:
     """
     Effective LLM configuration **shape** (file + env), never secret values.
 
-    Schema: ``apex.config.describe/v1``.
+    The returned ``schema`` value is ``CONFIG_DESCRIBE_SCHEMA_V1`` from ``apex.config.contracts``.
     """
     path = user_config_path()
     fc = load_user_llm_config()
@@ -73,7 +80,7 @@ def build_config_describe_snapshot() -> dict[str, object]:
 
     ak = env_str("ANTHROPIC_API_KEY")
     return {
-        "schema": "apex.config.describe/v1",
+        "schema": CONFIG_DESCRIBE_SCHEMA_V1,
         "config_file": file_block,
         "environment": {
             "APEX_LLM_PROVIDER": env_str_or_none("APEX_LLM_PROVIDER"),

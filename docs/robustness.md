@@ -10,6 +10,7 @@ Guarantees vs best-effort ([architecture.md](architecture.md), [safety.md](safet
 | **Single verification core** | `apex.pipeline.run.apex_run` is the only place a full run is orchestrated; input limits live in `apex.safety.run_input_limits`. |
 | **Ledger isolation** | SQLite writes run in a thread; failures are logged at **warning** and swallowed so the **tool result is never lost** because of the ledger. |
 | **Trace contract** | `finalize_run_result` validates `pipeline_steps` shape; issues surface under `metadata.telemetry.trace_validation` without failing the HTTP/MCP response. |
+| **Schema tokens** | Versioned `schema` / `verification_contract` literals live in `apex.config.contracts` ([compatibility.md](compatibility.md)). |
 | **Top-level errors** | Uncaught exceptions become `verdict: blocked` with sanitized `error` / `error_code` (optional `error_detail` behind env). |
 | **Tests without FastMCP** | `apex.mcp` package uses lazy `create_mcp_server`; submodules import without the `mcp` PyPI dependency. |
 | **Ledger reads** | Parameterized SQL; read-only `file:` URIs; bounded `limit`. |
@@ -46,4 +47,5 @@ Treat these as **contract** for how to integrate APEX, not implementation detail
 
 - `make check` (ruff + full pytest).
 - After MCP contract changes: update [mcp-tools.md](mcp-tools.md) and [tool-interface.md](tool-interface.md).
+- After schema token bumps: `apex.config.contracts` + [compatibility.md](compatibility.md).
 - After new pipeline steps: [pipeline-steps.md](pipeline-steps.md) + `tests/eval/` where verdict order matters.

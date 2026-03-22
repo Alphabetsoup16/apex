@@ -10,6 +10,7 @@ import apex.pipeline.code_mode as code_mode
 import apex.pipeline.run as pipeline_run
 import apex.pipeline.run_context as run_context
 import apex.pipeline.text_mode as text_mode
+from apex.config.contracts import TELEMETRY_SCHEMA_V1, UNCERTAINTY_SCHEMA_V1
 from apex.models import AdversarialReview, Finding, TextCompletion
 from tests.eval.cases import ALL_CASES, RegressionCase
 from tests.fakes import FakeLLMClient, sample_code_solution, sample_code_tests
@@ -138,6 +139,6 @@ def test_regression_pipeline_steps_and_verdict(
     steps = result.metadata.get("pipeline_steps") or []
     assert tuple(s["id"] for s in steps) == case.expect_step_ids
     tel = result.metadata.get("telemetry") or {}
-    assert tel.get("schema") == "apex.telemetry/v1"
+    assert tel.get("schema") == TELEMETRY_SCHEMA_V1
     assert len(tel.get("spans") or []) == len(steps)
-    assert (result.metadata.get("uncertainty") or {}).get("schema") == "apex.uncertainty/v1"
+    assert (result.metadata.get("uncertainty") or {}).get("schema") == UNCERTAINTY_SCHEMA_V1
