@@ -12,7 +12,7 @@ from apex.code_ground_truth.executor_client import (
     load_execution_backend_from_env,
 )
 from apex.config.constants import BASELINE_SIMILARITY_DOWNGRADE_THRESHOLD
-from apex.config.policy import load_findings_policy
+from apex.config.policy import FindingsPolicy
 from apex.generation.ensemble import (
     EnsembleConfig,
     generate_code_solution_variants,
@@ -65,8 +65,11 @@ async def run_code_mode(
     repo_conventions: str | None,
     output_mode: str,
     supplementary_context: str | None = None,
+    findings_policy: FindingsPolicy | None = None,
 ) -> ApexRunToolResult:
-    findings_policy = load_findings_policy()
+    fp = findings_policy
+    if fp is None:
+        raise ValueError("findings_policy is required for run_code_mode")
     extraction_ok = True
     execution: ExecutionResult | None = None
     convergence = 0.0
@@ -282,7 +285,16 @@ async def run_code_mode(
                     )
                     ms = int((time.perf_counter() - t_exec_start) * 1000)
                     return exec_result.pass_, ms, exec_result
-                except ExecutionBackendError:
+                except ExecutionBackendError as ebe:
+                    errs = ctx.setdefault("execution_suite_errors", [])
+                    errs.append(
+                        {
+                            "suite": suite_idx,
+                            "reason": ebe.reason,
+                            "http_status": ebe.http_status,
+                            "message": str(ebe)[:512],
+                        }
+                    )
                     return None, None, None
                 except asyncio.CancelledError:
                     raise
@@ -416,8 +428,8 @@ async def run_code_mode(
 
     async def _findings_policy() -> dict[str, Any]:
         nonlocal adversarial, inspection
-        adversarial = findings_policy.apply(adv_raw)
-        inspection = findings_policy.apply(ins_raw)
+        adversarial = fp.apply(adv_raw)
+        inspection = fp.apply(ins_raw)
         assert adversarial is not None and inspection is not None
         return {
             "ok": True,
@@ -492,6 +504,38 @@ async def run_code_mode(
             )
         )
 
+    meta: dict[str, Any] = {
+        "mode": actual_mode,
+        "ensemble_runs": ensemble_runs,
+        "convergence": convergence,
+        "ground_truth_enabled": code_ground_truth,
+        "verification_scale": "execution_ground_truth" if code_ground_truth else "spec_only",
+        "run_id": run_id,
+        "llm_model": client.model,
+        "baseline_similarity": baseline_similarity,
+        "output_mode": output_mode,
+        "timings_ms": {
+            "ensemble": ensemble_ms,
+            "tests": (
+                (tests_ms_per_suite[0] + tests_ms_per_suite[1])
+                if tests_ms_per_suite is not None
+                else tests_v1_ms
+            ),
+            "adversarial": adversarial_ms,
+            "inspection": inspection_ms,
+            "execution": execution_ms,
+            "total": int((time.perf_counter() - t_total_start) * 1000),
+        },
+        "execution_passes": execution_passes,
+        "tests_ms_per_suite": tests_ms_per_suite,
+        "execution_ms_per_suite": execution_ms_per_suite,
+        "inspection_review": inspection.model_dump(),
+        "language": language,
+        "pipeline_steps": pipeline_steps,
+    }
+    if ctx.get("execution_suite_errors"):
+        meta["execution_suite_errors"] = ctx["execution_suite_errors"]
+
     return ApexRunToolResult(
         verdict=verdict,
         output=(
@@ -509,33 +553,5 @@ async def run_code_mode(
         ),
         adversarial_review=adversarial,
         execution=execution,
-        metadata={
-            "mode": actual_mode,
-            "ensemble_runs": ensemble_runs,
-            "convergence": convergence,
-            "ground_truth_enabled": code_ground_truth,
-            "verification_scale": "execution_ground_truth" if code_ground_truth else "spec_only",
-            "run_id": run_id,
-            "llm_model": client.model,
-            "baseline_similarity": baseline_similarity,
-            "output_mode": output_mode,
-            "timings_ms": {
-                "ensemble": ensemble_ms,
-                "tests": (
-                    (tests_ms_per_suite[0] + tests_ms_per_suite[1])
-                    if tests_ms_per_suite is not None
-                    else tests_v1_ms
-                ),
-                "adversarial": adversarial_ms,
-                "inspection": inspection_ms,
-                "execution": execution_ms,
-                "total": int((time.perf_counter() - t_total_start) * 1000),
-            },
-            "execution_passes": execution_passes,
-            "tests_ms_per_suite": tests_ms_per_suite,
-            "execution_ms_per_suite": execution_ms_per_suite,
-            "inspection_review": inspection.model_dump(),
-            "language": language,
-            "pipeline_steps": pipeline_steps,
-        },
+        metadata=meta,
     )

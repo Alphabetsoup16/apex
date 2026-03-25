@@ -79,3 +79,30 @@ def load_findings_policy(*, repo_root: str | None = None) -> FindingsPolicy:
         str(x) for x in (merged.get("ignored_severities") or []) if str(x).strip()
     )
     return FindingsPolicy(ignored_types=ignored_types, ignored_severities=ignored_severities)
+
+
+def merge_findings_policy(
+    base: FindingsPolicy,
+    *,
+    extra_ignored_types: tuple[str, ...] = (),
+    extra_ignored_severities: tuple[str, ...] = (),
+) -> FindingsPolicy:
+    """
+    Merge per-run extras onto a loaded base policy (file/global).
+
+    Order: base entries first, then extras; duplicates are allowed and harmless.
+    """
+
+    def _dedupe_tail(a: tuple[str, ...], b: tuple[str, ...]) -> tuple[str, ...]:
+        seen = set(a)
+        out = list(a)
+        for x in b:
+            if x not in seen:
+                seen.add(x)
+                out.append(x)
+        return tuple(out)
+
+    return FindingsPolicy(
+        ignored_types=_dedupe_tail(base.ignored_types, extra_ignored_types),
+        ignored_severities=_dedupe_tail(base.ignored_severities, extra_ignored_severities),
+    )

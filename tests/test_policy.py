@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from apex.config.policy import FindingsPolicy
+import json
+from pathlib import Path
+
+import pytest
+
+from apex.config.policy import FindingsPolicy, load_findings_policy, merge_findings_policy
 from apex.models import AdversarialReview, Finding
 
 
@@ -54,3 +59,30 @@ def test_findings_policy_never_drops_high_even_when_type_or_severity_ignored() -
     out = p.apply(review)
     assert len(out.findings) == 1
     assert out.findings[0].evidence == "must_stay"
+
+
+def test_load_findings_policy_from_repo_file_merges_with_runtime_extras(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    policy_dir = root / ".apex"
+    policy_dir.mkdir()
+    (policy_dir / "policy.json").write_text(
+        json.dumps({"ignored_types": ["from_file"], "ignored_severities": []}),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(root)
+    base = load_findings_policy()
+    merged = merge_findings_policy(base, extra_ignored_types=("per_run",))
+    assert merged.ignored_types == ("from_file", "per_run")
+    assert merged.ignored_severities == ()
+
+
+def test_merge_findings_policy_unions_without_duplicates() -> None:
+    base = FindingsPolicy(ignored_types=("a",), ignored_severities=("low",))
+    merged = merge_findings_policy(
+        base, extra_ignored_types=("b", "a"), extra_ignored_severities=("info", "low")
+    )
+    assert merged.ignored_types == ("a", "b")
+    assert merged.ignored_severities == ("low", "info")

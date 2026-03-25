@@ -72,7 +72,7 @@ def _patch_for_case(monkeypatch: pytest.MonkeyPatch, case: RegressionCase) -> No
             lambda: FakeLLMClient("fake-code"),
         )
 
-        if case.name == "code_spec_only":
+        if case.name in ("code_spec_only", "code_spec_policy_extras"):
 
             async def fake_generate_code_solution_variants(*, client, prompt: str, config):
                 return [sample_code_solution()]
@@ -124,16 +124,20 @@ def test_regression_pipeline_steps_and_verdict(
 ) -> None:
     _patch_for_case(monkeypatch, case)
 
-    result = asyncio.run(
-        pipeline_run.apex_run(
-            prompt=case.prompt,
-            mode=case.mode,
-            ensemble_runs=3,
-            max_tokens=123,
-            code_ground_truth=case.code_ground_truth,
-            known_good_baseline=case.known_good_baseline,
-        )
-    )
+    run_kw: dict = {
+        "prompt": case.prompt,
+        "mode": case.mode,
+        "ensemble_runs": 3,
+        "max_tokens": 123,
+        "code_ground_truth": case.code_ground_truth,
+        "known_good_baseline": case.known_good_baseline,
+    }
+    if case.findings_ignore_types:
+        run_kw["findings_ignore_types"] = list(case.findings_ignore_types)
+    if case.findings_ignore_severities:
+        run_kw["findings_ignore_severities"] = list(case.findings_ignore_severities)
+
+    result = asyncio.run(pipeline_run.apex_run(**run_kw))
 
     assert result.verdict == case.expect_verdict
     steps = result.metadata.get("pipeline_steps") or []

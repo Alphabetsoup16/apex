@@ -75,7 +75,11 @@ def _is_configuration_runtime_message(msg: str) -> bool:
     needles = (
         "Missing Anthropic API key",
         "Missing Anthropic model",
+        "Missing OpenAI API key",
+        "Missing OpenAI model",
+        "Missing Bedrock model id",
         "Unsupported LLM provider",
+        "requires boto3",
         "run: apex init",
     )
     return any(n in msg for n in needles)
@@ -131,4 +135,8 @@ def build_top_level_error_metadata(exc: BaseException) -> dict[str, Any]:
         if len(raw) > _MAX_DETAIL_CHARS:
             raw = raw[:_MAX_DETAIL_CHARS] + "...[truncated]"
         meta["error_detail"] = raw
+    if isinstance(exc, ExecutionBackendError):
+        meta["execution_backend_reason"] = exc.reason
+        if exc.http_status is not None:
+            meta["execution_backend_http_status"] = exc.http_status
     return meta

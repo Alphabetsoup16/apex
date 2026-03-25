@@ -27,7 +27,20 @@ class ExecutionLimits:
 
 
 class ExecutionBackendError(RuntimeError):
-    pass
+    """Structured execution-backend failure (config, transport, HTTP status, response schema)."""
+
+    __slots__ = ("http_status", "reason")
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str = "internal",
+        http_status: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.http_status = http_status
 
 
 class HttpExecutionBackend:
@@ -68,7 +81,10 @@ class HttpExecutionBackend:
                 ),
             )
         except ValidationError as ve:
-            raise ExecutionBackendError(f"APEX internal request validation failed: {ve}") from ve
+            raise ExecutionBackendError(
+                f"APEX internal request validation failed: {ve}",
+                reason="invalid_request",
+            ) from ve
 
         payload: dict[str, Any] = request.model_dump()
 
@@ -85,7 +101,8 @@ class HttpExecutionBackend:
                     validated = ExecutionBackendResponse.model_validate(data)
                 except ValidationError as ve:
                     raise ExecutionBackendError(
-                        f"Execution backend returned invalid response schema: {ve}"
+                        f"Execution backend returned invalid response schema: {ve}",
+                        reason="invalid_response",
                     ) from ve
                 return validated
             except httpx.HTTPStatusError as e:
@@ -94,16 +111,33 @@ class HttpExecutionBackend:
                 if status in (502, 503, 504) and attempt < max_retries:
                     await asyncio.sleep(0.5 * (2**attempt))
                     continue
-                raise
+                raise ExecutionBackendError(
+                    f"Execution backend HTTP {status}",
+                    reason="http_error",
+                    http_status=status,
+                ) from e
+            except httpx.RequestError as e:
+                last_err = e
+                if attempt < max_retries:
+                    await asyncio.sleep(0.5 * (2**attempt))
+                    continue
+                raise ExecutionBackendError(
+                    f"Execution backend transport error: {type(e).__name__}",
+                    reason="transport",
+                ) from e
 
-        raise RuntimeError(f"Execution backend failed after retries: {last_err}") from last_err
+        raise ExecutionBackendError(
+            f"Execution backend failed after retries: {last_err}",
+            reason="internal",
+        ) from last_err
 
 
 def load_execution_backend_from_env() -> HttpExecutionBackend:
     backend_url = env_str("APEX_EXECUTION_BACKEND_URL")
     if not backend_url:
         raise ExecutionBackendError(
-            "APEX_EXECUTION_BACKEND_URL is not set; code-mode execution is unavailable."
+            "APEX_EXECUTION_BACKEND_URL is not set; code-mode execution is unavailable.",
+            reason="configuration",
         )
     api_key = env_str("APEX_EXECUTION_BACKEND_API_KEY")
     auth_header_name = env_str("APEX_EXECUTION_BACKEND_AUTH_HEADER") or "Authorization"

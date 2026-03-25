@@ -47,6 +47,8 @@ class ApexRunContext:
     supplementary_context: str | None
     prompt: str
     llm_client_factory: LLMClientFactory
+    findings_ignore_types: tuple[str, ...]
+    findings_ignore_severities: tuple[str, ...]
 
     def blocked_base_metadata(self, timings_total_ms: int = 0) -> dict[str, object]:
         """Shared ``metadata`` keys for blocked results (aligned with MCP preflight)."""
@@ -79,6 +81,8 @@ def build_apex_run_context(
     run_id: str | None = None,
     supplementary_context: str | None = None,
     llm_client_factory: LLMClientFactory | None = None,
+    findings_ignore_types: tuple[str, ...] = (),
+    findings_ignore_severities: tuple[str, ...] = (),
 ) -> ApexRunContext:
     ens_req, ens_eff = clamp_ensemble_runs(ensemble_runs)
     actual_mode, inferred = resolve_run_modes(prompt=prompt, mode=mode)
@@ -100,4 +104,6 @@ def build_apex_run_context(
         supplementary_context=supplementary_context,
         prompt=prompt,
         llm_client_factory=factory,
+        findings_ignore_types=findings_ignore_types,
+        findings_ignore_severities=findings_ignore_severities,
     )

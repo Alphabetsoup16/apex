@@ -75,10 +75,17 @@ def build_config_describe_snapshot() -> dict[str, object]:
             file_block["anthropic_base_url"] = str(fc.get("anthropic_base_url", "") or "")
             key = (fc.get("anthropic_api_key") or "").strip()
             file_block["anthropic_api_key"] = "set" if key else "empty"
+        elif prov == "openai":
+            file_block["openai_model"] = str(fc.get("openai_model", "") or "")
+            ok = (fc.get("openai_api_key") or "").strip()
+            file_block["openai_api_key"] = "set" if ok else "empty"
+        elif prov == "bedrock":
+            file_block["bedrock_model_id"] = str(fc.get("bedrock_model_id", "") or "")
     else:
         file_block["provider"] = None
 
     ak = env_str("ANTHROPIC_API_KEY")
+    ok = env_str("OPENAI_API_KEY")
     return {
         "schema": CONFIG_DESCRIBE_SCHEMA_V1,
         "config_file": file_block,
@@ -88,5 +95,11 @@ def build_config_describe_snapshot() -> dict[str, object]:
             "ANTHROPIC_API_KEY": "set" if ak else None,
             "ANTHROPIC_MODEL": env_str_or_none("ANTHROPIC_MODEL"),
             "ANTHROPIC_BASE_URL": env_str_or_none("ANTHROPIC_BASE_URL"),
+            "OPENAI_API_KEY": "set" if ok else None,
+            "OPENAI_MODEL": env_str_or_none("OPENAI_MODEL"),
+            "OPENAI_BASE_URL": env_str_or_none("OPENAI_BASE_URL"),
+            "BEDROCK_MODEL_ID": env_str_or_none("BEDROCK_MODEL_ID"),
+            "AWS_REGION": env_str_or_none("AWS_REGION"),
+            "BEDROCK_REGION": env_str_or_none("BEDROCK_REGION"),
         },
     }

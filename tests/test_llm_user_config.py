@@ -67,6 +67,28 @@ def test_user_config_path_respects_env(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert user_config_path() == p
 
 
+def test_load_openai_client_from_file_when_env_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cfg_path = tmp_path / "cfg.json"
+    monkeypatch.setenv("APEX_USER_CONFIG_PATH", str(cfg_path))
+    monkeypatch.setenv("APEX_LLM_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+
+    save_user_llm_config(
+        {
+            "provider": "openai",
+            "openai_api_key": "sk-openai-test",
+            "openai_model": "gpt-4o-mini",
+        }
+    )
+
+    client = llm_loader.load_llm_client_from_env()
+    assert client.model == "gpt-4o-mini"
+
+
 def test_load_user_llm_config_empty_for_bad_json(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

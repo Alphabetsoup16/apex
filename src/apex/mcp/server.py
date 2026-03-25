@@ -170,6 +170,8 @@ def create_mcp_server() -> FastMCP:
         output_mode: str = "candidate",
         correlation_id: str | None = None,
         supplementary_context: str | None = None,
+        findings_ignore_types: list[str] | None = None,
+        findings_ignore_severities: list[str] | None = None,
     ):
         """
         Run APEX verification on a prompt.
@@ -186,8 +188,11 @@ def create_mcp_server() -> FastMCP:
         Also performs chain-of-thought auditing on generated solution content.
 
         `mode="auto"` uses a small keyword heuristic and may misclassify; pass `mode` explicitly
-        when behavior must be predictable. `ensemble_runs` is clamped to 2-3; see response
+        when behavior must be predictable.         `ensemble_runs` is clamped to 2-3; see response
         metadata `ensemble_runs_requested` vs `ensemble_runs_effective`.
+
+        Optional `findings_ignore_types` / `findings_ignore_severities` extend the findings
+        policy for **code** mode only (merged with repo/global policy files).
         """
         run_id = str(uuid.uuid4())
         actual_mode, inferred = resolve_run_modes(prompt=prompt, mode=mode)
@@ -258,6 +263,8 @@ def create_mcp_server() -> FastMCP:
                     output_mode=output_mode,
                     run_id=run_id,
                     supplementary_context=supplementary_context,
+                    findings_ignore_types=findings_ignore_types,
+                    findings_ignore_severities=findings_ignore_severities,
                 )
             )
             if cid:

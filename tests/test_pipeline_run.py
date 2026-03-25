@@ -7,6 +7,7 @@ import apex.pipeline.run as pipeline_run
 import apex.pipeline.run_context as run_context
 import apex.pipeline.text_mode as text_mode
 from apex.code_ground_truth.executor_client import ExecutionBackendError
+from apex.config.policy import merge_findings_policy as merge_findings_policy_fn
 from apex.models import (
     AdversarialReview,
     ApexRunToolResult,
@@ -164,6 +165,73 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
     assert result.execution is None
 
 
+def test_apex_run_code_mode_wires_findings_overrides_into_merge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Guards silent drift: per-run lists must reach ``merge_findings_policy`` on the code path."""
+    merge_snapshots: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+
+    def capturing_merge(base, *, extra_ignored_types=(), extra_ignored_severities=()):
+        merge_snapshots.append((tuple(extra_ignored_types), tuple(extra_ignored_severities)))
+        return merge_findings_policy_fn(
+            base,
+            extra_ignored_types=extra_ignored_types,
+            extra_ignored_severities=extra_ignored_severities,
+        )
+
+    monkeypatch.setattr(run_execute, "merge_findings_policy", capturing_merge)
+
+    monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
+    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
+    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [sample_code_solution()]
+
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
+        v = 1 if suite_label == "tests_v1" else 2
+        return sample_code_tests(variant=v)
+
+    async def fake_review_code(**kwargs):
+        return AdversarialReview(
+            findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
+        )
+
+    async def fake_inspect_code_doc_only(**kwargs):
+        return AdversarialReview(findings=[])
+
+    monkeypatch.setattr(
+        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
+    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode, "decide_verdict", lambda signals: "needs_review")
+
+    def fake_load_execution_backend_from_env():
+        raise ExecutionBackendError("backend unavailable in test")
+
+    monkeypatch.setattr(
+        code_mode, "load_execution_backend_from_env", fake_load_execution_backend_from_env
+    )
+
+    asyncio.run(
+        pipeline_run.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+            findings_ignore_types=["slot_noise"],
+            findings_ignore_severities=["info"],
+        )
+    )
+
+    assert merge_snapshots == [(("slot_noise",), ("info",))]
+
+
 def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -235,6 +303,70 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
     assert result.metadata["execution_passes"] == [True, True]
     assert captured["execution_pass"] is True
     assert result.execution is not None
+
+
+def test_apex_run_code_mode_execution_http_records_suite_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
+    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
+    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+
+    async def fake_generate_code_solution_variants(*, client, prompt: str, config):
+        return [sample_code_solution()]
+
+    async def fake_generate_code_tests(
+        *, client, prompt: str, config, suite_label: str, temperature: float
+    ):
+        v = 1 if suite_label == "tests_v1" else 2
+        return sample_code_tests(variant=v)
+
+    async def fake_review_code(
+        *,
+        client,
+        task_prompt: str,
+        candidate,
+        tests_files_by_suite,
+        execution_passes,
+        max_tokens: int,
+    ):
+        assert execution_passes == [None, None]
+        return AdversarialReview(
+            findings=[Finding(severity="low", type="t", confidence=0.1, evidence="e")]
+        )
+
+    async def fake_inspect_code_doc_only(**kwargs):
+        return AdversarialReview(findings=[])
+
+    class _ErrBackend:
+        async def execute(self, *, run_id: str, solution: CodeSolution, tests: CodeTests, limits):
+            raise ExecutionBackendError("temporary", reason="http_error", http_status=502)
+
+    monkeypatch.setattr(
+        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+    )
+    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode, "decide_verdict", lambda signals: "needs_review")
+    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _ErrBackend())
+
+    result = asyncio.run(
+        pipeline_run.apex_run(
+            prompt="write code: implement f",
+            mode="code",
+            ensemble_runs=3,
+            max_tokens=123,
+            code_ground_truth=True,
+        )
+    )
+
+    assert result.verdict == "needs_review"
+    errs = result.metadata.get("execution_suite_errors") or []
+    assert len(errs) == 2
+    assert {e["suite"] for e in errs} == {0, 1}
+    assert all(e["reason"] == "http_error" and e["http_status"] == 502 for e in errs)
+    assert all(isinstance(e.get("message"), str) and "temporary" in e["message"] for e in errs)
 
 
 def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):

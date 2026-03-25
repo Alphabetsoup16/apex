@@ -20,3 +20,15 @@ def test_build_apex_run_context_uses_custom_llm_client_factory() -> None:
 def test_build_apex_run_context_defaults_to_env_loader() -> None:
     ctx = build_apex_run_context(prompt="x")
     assert ctx.llm_client_factory is load_llm_client_from_env
+    assert ctx.findings_ignore_types == ()
+    assert ctx.findings_ignore_severities == ()
+
+
+def test_build_apex_run_context_carries_findings_policy_overrides() -> None:
+    ctx = build_apex_run_context(
+        prompt="x",
+        findings_ignore_types=("noise",),
+        findings_ignore_severities=("info",),
+    )
+    assert ctx.findings_ignore_types == ("noise",)
+    assert ctx.findings_ignore_severities == ("info",)

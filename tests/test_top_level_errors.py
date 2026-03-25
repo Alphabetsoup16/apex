@@ -38,6 +38,13 @@ def test_classify_execution_backend_error() -> None:
     assert "execution backend" in msg.lower()
 
 
+def test_build_metadata_includes_execution_backend_reason() -> None:
+    exc = ExecutionBackendError("x", reason="http_error", http_status=503)
+    meta = te.build_top_level_error_metadata(exc)
+    assert meta["execution_backend_reason"] == "http_error"
+    assert meta["execution_backend_http_status"] == 503
+
+
 def test_build_metadata_omits_detail_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("APEX_EXPOSE_ERROR_DETAILS", raising=False)
     meta = te.build_top_level_error_metadata(RuntimeError("secret https://x/y"))

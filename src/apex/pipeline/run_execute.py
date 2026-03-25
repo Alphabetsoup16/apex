@@ -9,6 +9,7 @@ from typing import Literal
 
 from apex.config.conventions import load_effective_conventions
 from apex.config.env import env_str
+from apex.config.policy import load_findings_policy, merge_findings_policy
 from apex.generation.ensemble import EnsembleConfig
 from apex.ledger import load_ledger_config, record_apex_run_to_ledger_if_enabled
 from apex.models import ApexRunToolResult
@@ -103,6 +104,11 @@ async def execute_apex_pipeline(ctx: ApexRunContext) -> ApexRunToolResult:
                     output_mode=ctx.output_mode,
                 )
             else:
+                findings_policy = merge_findings_policy(
+                    load_findings_policy(),
+                    extra_ignored_types=ctx.findings_ignore_types,
+                    extra_ignored_severities=ctx.findings_ignore_severities,
+                )
                 result = await run_code_mode(
                     client=client,
                     prompt=ctx.prompt,
@@ -119,6 +125,7 @@ async def execute_apex_pipeline(ctx: ApexRunContext) -> ApexRunToolResult:
                     repo_conventions=effective_conventions,
                     output_mode=ctx.output_mode,
                     supplementary_context=ctx.supplementary_context,
+                    findings_policy=findings_policy,
                 )
             emit_progress(
                 PIPELINE_EXIT,

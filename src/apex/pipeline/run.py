@@ -24,7 +24,7 @@ from apex.pipeline.top_level_errors import (
     apex_sanitized_error,
 )
 from apex.runtime.run_limits import load_run_limit_settings, run_concurrency_gate
-from apex.safety.run_input_limits import validate_run_inputs
+from apex.safety.run_input_limits import parse_findings_policy_overrides, validate_run_inputs
 
 __all__ = ["LLMClientFactory", "apex_run", "resolve_run_modes"]
 
@@ -44,6 +44,8 @@ async def apex_run(
     run_id: str | None = None,
     supplementary_context: str | None = None,
     llm_client_factory: LLMClientFactory | None = None,
+    findings_ignore_types: list[str] | None = None,
+    findings_ignore_severities: list[str] | None = None,
 ) -> ApexRunToolResult:
     """
     ``run_id`` — optional stable id (e.g. MCP pre-allocated). Default: random UUID.
@@ -53,7 +55,13 @@ async def apex_run(
 
     ``llm_client_factory`` — optional ``() -> LLMClient``; default loads from env/config
     (``apex.llm.loader.load_llm_client_from_env``). Embedders pass a factory; MCP omits.
+
+    ``findings_ignore_*`` — optional per-run extensions to the findings policy (code mode
+    only); merged with ``.apex/policy.json`` / ``APEX_GLOBAL_POLICY_PATH``.
     """
+    pol_err, pol_types, pol_sev = parse_findings_policy_overrides(
+        findings_ignore_types, findings_ignore_severities
+    )
     ctx = build_apex_run_context(
         prompt=prompt,
         mode=mode,
@@ -68,7 +76,12 @@ async def apex_run(
         run_id=run_id,
         supplementary_context=supplementary_context,
         llm_client_factory=llm_client_factory,
+        findings_ignore_types=pol_types,
+        findings_ignore_severities=pol_sev,
     )
+
+    if pol_err is not None:
+        return await _finalize_input_blocked(ctx, pol_err)
 
     bad_in = validate_run_inputs(
         prompt=prompt,
