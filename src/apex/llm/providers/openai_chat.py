@@ -7,6 +7,10 @@ from typing import Any
 
 import httpx
 
+from apex.llm.json_from_text import (
+    complete_json_object_via_text_attempts,
+    retry_user_reset_to_base_with_suffix,
+)
 from apex.safety.redaction import redact_secrets
 from apex.safety.validators import extract_first_json_object
 
@@ -98,12 +102,12 @@ class OpenAIChatClient:
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 400:
-                return await self._json_via_text_loop(
+                return await self._json_via_text_extraction(
                     system=system, user=user, max_tokens=max_tokens, temperature=temperature
                 )
             raise
         except (ValueError, json.JSONDecodeError, TypeError, KeyError):
-            return await self._json_via_text_loop(
+            return await self._json_via_text_extraction(
                 system=system, user=user, max_tokens=max_tokens, temperature=temperature
             )
 
@@ -142,7 +146,7 @@ class OpenAIChatClient:
             raise ValueError("openai: missing content")
         return json.loads(extract_first_json_object(content))
 
-    async def _json_via_text_loop(
+    async def _json_via_text_extraction(
         self,
         *,
         system: str,
@@ -150,25 +154,20 @@ class OpenAIChatClient:
         max_tokens: int,
         temperature: float,
     ) -> dict[str, Any]:
-        parse_err: Exception | None = None
-        u = user
-        budget = self._config.max_retries + 1
-        for attempt in range(budget):
-            text = await self.complete_text(
-                system=system + "\n\nRespond with a single JSON object only.",
-                user=u,
+        sys_json = system + "\n\nRespond with a single JSON object only."
+
+        async def fetch_text(attempt: int, user_msg: str) -> str:
+            return await self.complete_text(
+                system=sys_json,
+                user=user_msg,
                 max_tokens=max_tokens,
                 temperature=(0.0 if attempt > 0 else temperature),
             )
-            try:
-                return json.loads(extract_first_json_object(text))
-            except asyncio.CancelledError:
-                raise
-            except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
-                parse_err = e
-                u = (
-                    user
-                    + "\n\nIMPORTANT: Your previous output was not valid JSON. "
-                    + "Output ONLY a single valid JSON object and nothing else."
-                )
-        raise RuntimeError(f"Failed to obtain valid JSON from OpenAI: {parse_err}") from parse_err
+
+        return await complete_json_object_via_text_attempts(
+            fetch_text=fetch_text,
+            initial_user=user,
+            max_attempts=self._config.max_retries + 1,
+            on_parse_failure_advance_user=retry_user_reset_to_base_with_suffix,
+            failure_label="OpenAI",
+        )

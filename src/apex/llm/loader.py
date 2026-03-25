@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from apex.config.env import env_str
+from apex.config.errors import ApexConfigurationError
+from apex.llm.env_resolution import env_then_file_str, first_file_str
 from apex.llm.interface import LLMClient
 from apex.llm.providers.anthropic_messages import AnthropicConfig, AnthropicMessagesClient
 from apex.llm.providers.openai_chat import OpenAIChatClient, OpenAIChatConfig
@@ -27,65 +29,82 @@ def load_llm_client_from_env() -> LLMClient:
         provider = str(file_cfg.get("provider") or "anthropic").strip().lower() or "anthropic"
 
     if provider == "anthropic":
-        api_key = env_str("ANTHROPIC_API_KEY")
-        if not api_key:
-            api_key = str(file_cfg.get("anthropic_api_key") or "").strip()
-
-        model = env_str("ANTHROPIC_MODEL")
-        if not model:
-            model = str(file_cfg.get("anthropic_model") or "").strip()
-
-        base_url = env_str("ANTHROPIC_BASE_URL")
-        if not base_url:
-            base_url = str(file_cfg.get("anthropic_base_url") or "").strip()
+        api_key = env_then_file_str(
+            env_name="ANTHROPIC_API_KEY",
+            file_cfg=file_cfg,
+            file_keys="anthropic_api_key",
+        )
+        model = env_then_file_str(
+            env_name="ANTHROPIC_MODEL",
+            file_cfg=file_cfg,
+            file_keys="anthropic_model",
+        )
+        base_url = env_then_file_str(
+            env_name="ANTHROPIC_BASE_URL",
+            file_cfg=file_cfg,
+            file_keys="anthropic_base_url",
+            default=DEFAULT_ANTHROPIC_BASE_URL,
+        )
         if not base_url:
             base_url = DEFAULT_ANTHROPIC_BASE_URL
 
         if not api_key:
-            raise RuntimeError("Missing Anthropic API key. Set ANTHROPIC_API_KEY or run: apex init")
+            raise ApexConfigurationError(
+                "Missing Anthropic API key. Set ANTHROPIC_API_KEY or run: apex init"
+            )
         if not model:
-            raise RuntimeError("Missing Anthropic model. Set ANTHROPIC_MODEL or run: apex init")
+            raise ApexConfigurationError(
+                "Missing Anthropic model. Set ANTHROPIC_MODEL or run: apex init"
+            )
         return AnthropicMessagesClient(
             AnthropicConfig(api_key=api_key, model=model, base_url=base_url)
         )
 
     if provider == "openai":
-        api_key = env_str("OPENAI_API_KEY")
-        if not api_key:
-            api_key = str(file_cfg.get("openai_api_key") or "").strip()
-
-        model = env_str("OPENAI_MODEL")
-        if not model:
-            model = str(file_cfg.get("openai_model") or "").strip()
-
-        base_url = env_str("OPENAI_BASE_URL")
-        if not base_url:
-            base_url = str(file_cfg.get("openai_base_url") or "").strip()
+        api_key = env_then_file_str(
+            env_name="OPENAI_API_KEY",
+            file_cfg=file_cfg,
+            file_keys="openai_api_key",
+        )
+        model = env_then_file_str(
+            env_name="OPENAI_MODEL",
+            file_cfg=file_cfg,
+            file_keys="openai_model",
+        )
+        base_url = env_then_file_str(
+            env_name="OPENAI_BASE_URL",
+            file_cfg=file_cfg,
+            file_keys="openai_base_url",
+            default="https://api.openai.com/v1",
+        )
         if not base_url:
             base_url = "https://api.openai.com/v1"
 
         if not api_key:
-            raise RuntimeError("Missing OpenAI API key. Set OPENAI_API_KEY or run: apex init")
+            raise ApexConfigurationError(
+                "Missing OpenAI API key. Set OPENAI_API_KEY or run: apex init"
+            )
         if not model:
-            raise RuntimeError("Missing OpenAI model. Set OPENAI_MODEL or run: apex init")
+            raise ApexConfigurationError("Missing OpenAI model. Set OPENAI_MODEL or run: apex init")
         return OpenAIChatClient(OpenAIChatConfig(api_key=api_key, model=model, base_url=base_url))
 
     if provider == "bedrock":
         from apex.llm.providers.bedrock_converse import BedrockConverseClient, BedrockConverseConfig
 
-        model = env_str("BEDROCK_MODEL_ID")
-        if not model:
-            model = str(file_cfg.get("bedrock_model_id") or "").strip()
-
+        model = env_then_file_str(
+            env_name="BEDROCK_MODEL_ID",
+            file_cfg=file_cfg,
+            file_keys="bedrock_model_id",
+        )
         region = env_str("AWS_REGION") or env_str("BEDROCK_REGION")
         if not region:
-            region = str(file_cfg.get("aws_region") or file_cfg.get("bedrock_region") or "").strip()
+            region = first_file_str(file_cfg, ("aws_region", "bedrock_region"))
         region_val = region or None
 
         if not model:
-            raise RuntimeError(
+            raise ApexConfigurationError(
                 "Missing Bedrock model id. Set BEDROCK_MODEL_ID or bedrock_model_id in config."
             )
         return BedrockConverseClient(BedrockConverseConfig(model_id=model, region=region_val))
 
-    raise RuntimeError(f"Unsupported LLM provider: {provider}")
+    raise ApexConfigurationError(f"Unsupported LLM provider: {provider}")

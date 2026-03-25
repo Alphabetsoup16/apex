@@ -23,7 +23,7 @@ APEX splits **orchestration** (pipeline), **LLM work** (generation/review), **sc
 ## Entrypoints
 
 - **`apex_run`** — Exported from **`apex.pipeline`** (defined in `run.py`). The MCP **`run`** tool and Python embedders call this.
-- **`apex.pipeline.run_execute.execute_apex_pipeline`** — LLM pipeline body (invokes `ctx.llm_client_factory()`, text/code modes, finalize, ledger dispatch). Tests that stub the default env-backed client should patch **`apex.pipeline.run_context.load_llm_client_from_env`** (resolved when building `ApexRunContext`). Stub `run_text_mode` / `run_code_mode` on **`apex.pipeline.run_execute`**.
+- **`apex.pipeline.run_execute.execute_apex_pipeline`** — LLM pipeline body (invokes `ctx.llm_client_factory()`, text/code modes, finalize, ledger dispatch). Tests that stub the default env-backed client should patch **`apex.pipeline.run_context.load_llm_client_from_env`** (resolved when building `ApexRunContext`). Stub `run_text_mode` / `run_code_mode` on **`apex.pipeline.run_execute`**, or stub code-mode collaborators on **`apex.pipeline.code_mode_bindings`** (generation, review, execution loader, scoring helpers).
 - **`apex.pipeline.helpers`** — Shared helpers (`validate_code_bundles`, mode heuristic, etc.).
 
 ## Call direction

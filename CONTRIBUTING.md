@@ -14,7 +14,7 @@ make check
 
 - **MCP vs core:** `apex.pipeline.*` never imports FastMCP. Server wiring: `apex.mcp.server`.
 - **One run:** Orchestration `run.py` → LLM body `run_execute.py` → frozen inputs `run_context.py`. [architecture.md](docs/architecture.md).
-- **Monkeypatch the binding module** (e.g. `apex.pipeline.run_context.load_llm_client_from_env` for the default client factory; `apex.pipeline.run_execute` for `run_text_mode` / `run_code_mode`). [docs/README.md#where-tests-live](docs/README.md#where-tests-live).
+- **Monkeypatch the binding module** (e.g. `apex.pipeline.run_context.load_llm_client_from_env` for the default client factory; `apex.pipeline.run_execute` for `run_text_mode` / `run_code_mode`; `apex.pipeline.code_mode_bindings` for code-mode generation/review/execution/scoring stubs). [docs/README.md#where-tests-live](docs/README.md#where-tests-live).
 - **Fakes:** [tests/fakes.py](tests/fakes.py) — `FakeLLMClient`, `sample_code_solution`, `sample_code_tests`.
 
 ## Style

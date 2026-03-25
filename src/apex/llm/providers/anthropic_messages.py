@@ -7,8 +7,11 @@ from typing import Any
 
 import httpx
 
+from apex.llm.json_from_text import (
+    complete_json_object_via_text_attempts,
+    retry_user_append_suffix,
+)
 from apex.safety.redaction import redact_secrets
-from apex.safety.validators import extract_first_json_object
 
 
 @dataclass(frozen=True)
@@ -89,27 +92,18 @@ class AnthropicMessagesClient:
         max_tokens: int,
         temperature: float,
     ) -> dict[str, Any]:
-        parse_err: Exception | None = None
-        retry_budget = self._config.max_retries + 1
-
-        for attempt in range(retry_budget):
-            text = await self.complete_text(
+        async def fetch_text(attempt: int, user_msg: str) -> str:
+            return await self.complete_text(
                 system=system,
-                user=user,
+                user=user_msg,
                 max_tokens=max_tokens,
                 temperature=(0.0 if attempt > 0 else temperature),
             )
-            try:
-                json_str = extract_first_json_object(text)
-                return json.loads(json_str)
-            except asyncio.CancelledError:
-                raise
-            except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
-                parse_err = e
-                user = (
-                    user
-                    + "\n\nIMPORTANT: Your previous output was not valid JSON. "
-                    + "Output ONLY a single valid JSON object and nothing else."
-                )
 
-        raise RuntimeError(f"Failed to obtain valid JSON from model: {parse_err}") from parse_err
+        return await complete_json_object_via_text_attempts(
+            fetch_text=fetch_text,
+            initial_user=user,
+            max_attempts=self._config.max_retries + 1,
+            on_parse_failure_advance_user=retry_user_append_suffix,
+            failure_label="model",
+        )

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import dataclass
 from typing import Any
 
+from apex.config.errors import ApexConfigurationError
+from apex.llm.json_from_text import (
+    complete_json_object_via_text_attempts,
+    retry_user_reset_to_base_with_suffix,
+)
 from apex.safety.redaction import redact_secrets
-from apex.safety.validators import extract_first_json_object
 
 
 @dataclass(frozen=True)
@@ -15,6 +18,7 @@ class BedrockConverseConfig:
 
     model_id: str
     region: str | None = None
+    max_retries: int = 2
 
 
 class BedrockConverseClient:
@@ -22,7 +26,7 @@ class BedrockConverseClient:
         try:
             import boto3  # type: ignore[import-untyped]
         except ImportError as e:
-            raise RuntimeError(
+            raise ApexConfigurationError(
                 "Bedrock provider requires boto3. Install with: pip install 'apex[bedrock]'"
             ) from e
         self._config = config
@@ -88,25 +92,19 @@ class BedrockConverseClient:
         temperature: float,
     ) -> dict[str, Any]:
         sys_json = system + "\n\nRespond with a single JSON object only."
-        parse_err: Exception | None = None
-        u = user
-        budget = 3
-        for attempt in range(budget):
-            text = await self.complete_text(
+
+        async def fetch_text(attempt: int, user_msg: str) -> str:
+            return await self.complete_text(
                 system=sys_json,
-                user=u,
+                user=user_msg,
                 max_tokens=max_tokens,
                 temperature=(0.0 if attempt > 0 else temperature),
             )
-            try:
-                return json.loads(extract_first_json_object(text))
-            except asyncio.CancelledError:
-                raise
-            except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
-                parse_err = e
-                u = (
-                    user
-                    + "\n\nIMPORTANT: Your previous output was not valid JSON. "
-                    + "Output ONLY a single valid JSON object and nothing else."
-                )
-        raise RuntimeError(f"Failed to obtain valid JSON from Bedrock: {parse_err}") from parse_err
+
+        return await complete_json_object_via_text_attempts(
+            fetch_text=fetch_text,
+            initial_user=user,
+            max_attempts=self._config.max_retries + 1,
+            on_parse_failure_advance_user=retry_user_reset_to_base_with_suffix,
+            failure_label="Bedrock",
+        )

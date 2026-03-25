@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-import apex.pipeline.code_mode as code_mode
+import apex.pipeline.code_mode_bindings as code_mode_bindings
 import apex.pipeline.run as pipeline_run
 import apex.pipeline.run_context as run_context
 import apex.pipeline.text_mode as text_mode
@@ -89,8 +89,8 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.7)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         assert client.model == "fake-code"
@@ -134,18 +134,18 @@ def test_apex_run_code_mode_backend_error_downgrades_execution_pass_none(
         return "needs_review"
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "decide_verdict", fake_decide_verdict)
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode_bindings, "decide_verdict", fake_decide_verdict)
 
     def fake_load_execution_backend_from_env():
         raise ExecutionBackendError("backend unavailable in test")
 
     monkeypatch.setattr(
-        code_mode, "load_execution_backend_from_env", fake_load_execution_backend_from_env
+        code_mode_bindings, "load_execution_backend_from_env", fake_load_execution_backend_from_env
     )
 
     result = asyncio.run(
@@ -182,8 +182,8 @@ def test_apex_run_code_mode_wires_findings_overrides_into_merge(
     monkeypatch.setattr(run_execute, "merge_findings_policy", capturing_merge)
 
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.7)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -203,18 +203,18 @@ def test_apex_run_code_mode_wires_findings_overrides_into_merge(
         return AdversarialReview(findings=[])
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "decide_verdict", lambda signals: "needs_review")
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode_bindings, "decide_verdict", lambda signals: "needs_review")
 
     def fake_load_execution_backend_from_env():
         raise ExecutionBackendError("backend unavailable in test")
 
     monkeypatch.setattr(
-        code_mode, "load_execution_backend_from_env", fake_load_execution_backend_from_env
+        code_mode_bindings, "load_execution_backend_from_env", fake_load_execution_backend_from_env
     )
 
     asyncio.run(
@@ -236,8 +236,8 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.7)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -281,13 +281,17 @@ def test_apex_run_code_mode_backend_success_propagates_execution_pass_true(
         return "high_verified"
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "decide_verdict", fake_decide_verdict)
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _FakeBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode_bindings, "decide_verdict", fake_decide_verdict)
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _FakeBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -309,8 +313,8 @@ def test_apex_run_code_mode_execution_http_records_suite_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.7)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.7)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -343,13 +347,17 @@ def test_apex_run_code_mode_execution_http_records_suite_diagnostics(
             raise ExecutionBackendError("temporary", reason="http_error", http_status=502)
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "decide_verdict", lambda signals: "needs_review")
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _ErrBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode_bindings, "decide_verdict", lambda signals: "needs_review")
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _ErrBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -371,8 +379,8 @@ def test_apex_run_code_mode_execution_http_records_suite_diagnostics(
 
 def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -397,12 +405,16 @@ def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
             return ExecutionResult(**{"pass": True}, stdout="ok", stderr="", duration_ms=1)
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _FakeBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _FakeBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -425,8 +437,8 @@ def test_apex_run_code_mode_review_pack_output(monkeypatch: pytest.MonkeyPatch):
 
 def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.5)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.5)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         # Put a CoT marker inside the generated code comment.
@@ -450,10 +462,10 @@ def test_apex_run_code_mode_blocks_on_cot_leakage(monkeypatch: pytest.MonkeyPatc
         raise AssertionError("review_code should not run when CoT leakage is detected")
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -475,8 +487,8 @@ def test_apex_run_code_mode_inspection_high_blocks_verdict(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -523,12 +535,16 @@ def test_apex_run_code_mode_inspection_high_blocks_verdict(
             )
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _FakeBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _FakeBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -549,8 +565,8 @@ def test_apex_run_code_mode_inspection_medium_does_not_block(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -598,12 +614,16 @@ def test_apex_run_code_mode_inspection_medium_does_not_block(
             )
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _FakeBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _FakeBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -624,8 +644,8 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.5)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.5)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         assert client.model == "fake-code"
@@ -654,11 +674,11 @@ def test_apex_run_mode_auto_blocks_on_missing_test_solution_py(
         )
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -751,11 +771,11 @@ def test_apex_run_code_ground_truth_false_never_high_verified(
         return AdversarialReview(findings=[])
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -821,12 +841,16 @@ def test_apex_run_code_ground_truth_one_suite_fails_blocks(
             )
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _FakeBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _FakeBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(
@@ -922,8 +946,8 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(run_context, "load_llm_client_from_env", lambda: FakeLLMClient("fake-code"))
-    monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
-    monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+    monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.99)
+    monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
     async def fake_generate_code_solution_variants(*, client, prompt: str, config):
         return [sample_code_solution()]
@@ -961,12 +985,16 @@ def test_apex_run_code_mode_baseline_downgrades_high_verified(
             )
 
     monkeypatch.setattr(
-        code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+        code_mode_bindings, "generate_code_solution_variants", fake_generate_code_solution_variants
     )
-    monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-    monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-    monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-    monkeypatch.setattr(code_mode, "load_execution_backend_from_env", lambda: _FakeBackend())
+    monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+    monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+    monkeypatch.setattr(code_mode_bindings, "inspect_code_doc_only", fake_inspect_code_doc_only)
+    monkeypatch.setattr(
+        code_mode_bindings,
+        "load_execution_backend_from_env",
+        lambda: _FakeBackend(),
+    )
 
     result = asyncio.run(
         pipeline_run.apex_run(

@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from apex.code_ground_truth.executor_client import ExecutionBackendError
+from apex.config.errors import ApexConfigurationError
 from apex.pipeline import top_level_errors as te
 
 
@@ -13,6 +14,14 @@ def test_classify_value_error_is_validation() -> None:
     code, msg = te.classify_top_level_exception(ValueError("missing_test_solution_py"))
     assert code == te.APEX_VALIDATION
     assert "Validation failed" in msg
+
+
+def test_classify_apex_configuration_error() -> None:
+    code, msg = te.classify_top_level_exception(
+        ApexConfigurationError("Missing OpenAI API key. Set OPENAI_API_KEY or run: apex init")
+    )
+    assert code == te.APEX_CONFIGURATION
+    assert msg == te.apex_sanitized_error(te.APEX_CONFIGURATION)
 
 
 def test_classify_configuration_runtime_error() -> None:

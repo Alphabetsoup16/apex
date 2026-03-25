@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-import apex.pipeline.code_mode as code_mode
+import apex.pipeline.code_mode_bindings as code_mode_bindings
 import apex.pipeline.run as pipeline_run
 import apex.pipeline.run_context as run_context
 import apex.pipeline.text_mode as text_mode
@@ -102,13 +102,19 @@ def _patch_for_case(monkeypatch: pytest.MonkeyPatch, case: RegressionCase) -> No
                 return AdversarialReview(findings=[])
 
             monkeypatch.setattr(
-                code_mode, "generate_code_solution_variants", fake_generate_code_solution_variants
+                code_mode_bindings,
+                "generate_code_solution_variants",
+                fake_generate_code_solution_variants,
             )
-            monkeypatch.setattr(code_mode, "generate_code_tests", fake_generate_code_tests)
-            monkeypatch.setattr(code_mode, "review_code", fake_review_code)
-            monkeypatch.setattr(code_mode, "inspect_code_doc_only", fake_inspect_code_doc_only)
-            monkeypatch.setattr(code_mode, "code_convergence", lambda solutions: 0.99)
-            monkeypatch.setattr(code_mode, "select_best_code", lambda solutions: 0)
+            monkeypatch.setattr(code_mode_bindings, "generate_code_tests", fake_generate_code_tests)
+            monkeypatch.setattr(code_mode_bindings, "review_code", fake_review_code)
+            monkeypatch.setattr(
+                code_mode_bindings,
+                "inspect_code_doc_only",
+                fake_inspect_code_doc_only,
+            )
+            monkeypatch.setattr(code_mode_bindings, "code_convergence", lambda solutions: 0.99)
+            monkeypatch.setattr(code_mode_bindings, "select_best_code", lambda solutions: 0)
 
         else:
             raise AssertionError(f"unknown code case {case.name!r}")

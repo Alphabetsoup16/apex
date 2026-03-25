@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from apex.config.errors import ApexConfigurationError
 from apex.llm import loader as llm_loader
 from apex.llm.user_config import load_user_llm_config, save_user_llm_config, user_config_path
 
@@ -57,7 +58,7 @@ def test_missing_key_error_suggests_setup(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
 
-    with pytest.raises(RuntimeError, match="apex init"):
+    with pytest.raises(ApexConfigurationError, match="apex init"):
         llm_loader.load_llm_client_from_env()
 
 

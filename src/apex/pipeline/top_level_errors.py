@@ -10,6 +10,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from apex.code_ground_truth.executor_client import ExecutionBackendError
 from apex.config.env import env_bool
+from apex.config.errors import ApexConfigurationError
 
 APEX_CONFIGURATION = "apex.configuration"
 APEX_VALIDATION = "apex.validation"
@@ -100,6 +101,9 @@ def classify_top_level_exception(exc: BaseException) -> tuple[str, str]:
         return APEX_IO, _SANITIZED[APEX_IO]
     if isinstance(exc, ExecutionBackendError):
         return APEX_EXECUTION_BACKEND, _SANITIZED[APEX_EXECUTION_BACKEND]
+
+    if isinstance(exc, ApexConfigurationError):
+        return APEX_CONFIGURATION, _SANITIZED[APEX_CONFIGURATION]
 
     if isinstance(exc, RuntimeError):
         msg = str(exc)
