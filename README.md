@@ -1,12 +1,27 @@
 # APEX (Adversarial Pipeline for Execution eXamination)
 
-MCP server that checks LLM outputs with:
+## What we are trying to do
+
+Large language models can sound confident even when they are wrong. APEX exists to give you a **second opinion** on an AI-generated answer—while you are still writing or reviewing—not to replace your full test and security pipeline.
+
+In plain terms:
+
+1. **You (or your agent)** send a prompt and a candidate answer to check.
+2. **APEX** asks the model for several alternative answers and looks for agreement (**ensemble**).
+3. **A separate review pass** hunts for problems and reports them as structured findings (**adversarial review**).
+4. **If you use code mode**, it can optionally run tests against **your** execution backend so you see whether the code actually behaves as intended.
+
+You get a **verdict** (`high_verified`, `needs_review`, or `blocked`) plus details you can use to decide what still needs human scrutiny. Think of it as **fast, review-time verification** for AI-assisted work—not a substitute for CI, SAST, dependency scanning, or your repo’s own test matrix. Use APEX when authoring or reviewing; keep your normal pipeline for shipping.
+
+**How you use it:** APEX is an **MCP server**. Tools like Cursor or other MCP-aware hosts can call it (main tool: **`run`**) so verification fits into the same workflow where the model produced the answer.
+
+---
+
+**Mechanically,** the server checks LLM outputs with:
 
 - **Ensemble** generation and convergence
 - **Adversarial** review (structured findings)
 - **Code mode:** optional execution against your backend (two independent pytest suites)
-
-**Scope:** Fast, review-oriented signals (what to scrutinize)—not a replacement for full CI (matrices, SAST, dependency scans, etc.). Run those in your normal pipeline; use APEX at authoring/review time.
 
 ## Verdicts
 
