@@ -2,26 +2,11 @@
 
 ## What we are trying to do
 
-Large language models can sound confident even when they are wrong. APEX exists to give you a **second opinion** on an AI-generated answer—while you are still writing or reviewing—not to replace your full test and security pipeline.
+Models can be wrong and still sound confident. APEX is a **quick second check** on an AI draft while you write or review—not a substitute for CI, security scans, or your repo’s full tests.
 
-In plain terms:
+Run it as an **MCP server**; hosts call **`run`** with a prompt and the answer to verify. APEX generates several alternatives and compares them (**ensemble**), runs an **adversarial review** with clear structured findings, and in **code mode** can execute tests on **your** backend. You get a verdict (`high_verified`, `needs_review`, or `blocked`) and signals that tell you where a human should still look.
 
-1. **You (or your agent)** send a prompt and a candidate answer to check.
-2. **APEX** asks the model for several alternative answers and looks for agreement (**ensemble**).
-3. **A separate review pass** hunts for problems and reports them as structured findings (**adversarial review**).
-4. **If you use code mode**, it can optionally run tests against **your** execution backend so you see whether the code actually behaves as intended.
-
-You get a **verdict** (`high_verified`, `needs_review`, or `blocked`) plus details you can use to decide what still needs human scrutiny. Think of it as **fast, review-time verification** for AI-assisted work—not a substitute for CI, SAST, dependency scanning, or your repo’s own test matrix. Use APEX when authoring or reviewing; keep your normal pipeline for shipping.
-
-**How you use it:** APEX is an **MCP server**. Tools like Cursor or other MCP-aware hosts can call it (main tool: **`run`**) so verification fits into the same workflow where the model produced the answer.
-
----
-
-**Mechanically,** the server checks LLM outputs with:
-
-- **Ensemble** generation and convergence
-- **Adversarial** review (structured findings)
-- **Code mode:** optional execution against your backend (two independent pytest suites)
+Under the hood: ensemble convergence, adversarial review, and optional backend execution (two independent pytest suites).
 
 ## Verdicts
 
